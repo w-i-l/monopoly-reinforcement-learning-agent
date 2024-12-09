@@ -1,0 +1,18 @@
+{
+  "group": "utilities",
+  "color": "#000000",
+  "indexes": [12, 28],
+  "properties": [
+    {
+      "id": 12,
+      "name": "Uzina de Apa"
+    },
+    {
+      "id": 28,
+      "name": "Uzina Electrica"
+    }
+  ],
+  "price": 150,
+  "mortage": 75,
+  "buyback_price": 83
+}

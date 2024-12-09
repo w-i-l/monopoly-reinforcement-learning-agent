@@ -1,0 +1,31 @@
+{
+  "group": "brown",
+  "color": "#845031",
+  "indexes": [1, 3],
+  "properties": [
+    {
+      "name": "Rahova",
+      "id": 1,
+      "price": 60,
+      "base_rent": 2,
+      "full_group_rent": 4,
+      "house_rent": [10, 30, 90, 160],
+      "hotel_rent": 250,
+      "mortage": 30,
+      "buyback_price": 33
+    },
+    {
+      "name": "Giulesti",
+      "id": 3,
+      "price": 60,
+      "base_rent": 4,
+      "full_group_rent": 8,
+      "house_rent": [20, 60, 180, 320],
+      "hotel_rent": 450,
+      "mortage": 30,
+      "buyback_price": 33
+    }
+  ],
+  "house_cost": 50,
+  "hotel_cost": 50
+}

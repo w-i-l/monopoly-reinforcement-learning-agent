@@ -1,0 +1,42 @@
+{
+  "group": "pink",
+  "color": "#b63785",
+  "indexes": [11, 13, 14],
+  "properties": [
+    {
+      "name": "Titan",
+      "id": 11,
+      "price": 140,
+      "base_rent": 10,
+      "full_group_rent": 20,
+      "house_rent": [50, 150, 450, 625],
+      "hotel_rent": 750,
+      "mortage": 70,
+      "buyback_price": 77
+    },
+    {
+      "name": "Colentina",
+      "id": 13,
+      "price": 140,
+      "base_rent": 10,
+      "full_group_rent": 20,
+      "house_rent": [50, 150, 450, 625],
+      "hotel_rent": 750,
+      "mortage": 70,
+      "buyback_price": 77
+    },
+    {
+      "name": "Tei",
+      "id": 14,
+      "price": 160,
+      "base_rent": 12,
+      "full_group_rent": 24,
+      "house_rent": [60, 180, 500, 700],
+      "hotel_rent": 900,
+      "mortage": 80,
+      "buyback_price": 88
+    }
+  ],
+  "house_cost": 100,
+  "hotel_cost": 100
+}

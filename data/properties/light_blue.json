@@ -1,0 +1,42 @@
+{
+  "group": "light_blue",
+  "color": "#c0e0f9",
+  "indexes": [6, 8, 9],
+  "properties": [
+    {
+      "name": "Vitan",
+      "id": 6,
+      "price": 100,
+      "base_rent": 6,
+      "full_group_rent": 12,
+      "house_rent": [30, 90, 270, 400],
+      "hotel_rent": 550,
+      "mortage": 50,
+      "buyback_price": 55
+    },
+    {
+      "name": "Pantelimon",
+      "id": 8,
+      "price": 100,
+      "base_rent": 6,
+      "full_group_rent": 12,
+      "house_rent": [30, 90, 270, 400],
+      "hotel_rent": 550,
+      "mortage": 50,
+      "buyback_price": 55
+    },
+    {
+      "name": "Berceni",
+      "id": 9,
+      "price": 120,
+      "base_rent": 8,
+      "full_group_rent": 16,
+      "house_rent": [40, 100, 300, 450],
+      "hotel_rent": 600,
+      "mortage": 60,
+      "buyback_price": 66
+    }
+  ],
+  "house_cost": 50,
+  "hotel_cost": 50
+}

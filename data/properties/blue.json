@@ -1,0 +1,31 @@
+{
+  "group": "blue",
+  "color": "#1166b0",
+  "indexes": [37, 39],
+  "properties": [
+    {
+      "name": "B-dul Magheru",
+      "id": 37,
+      "price": 350,
+      "base_rent": 35,
+      "full_group_rent": 70,
+      "house_rent": [175, 500, 1100, 1300],
+      "hotel_rent": 1500,
+      "mortage": 175,
+      "buyback_price": 193
+    },
+    {
+      "name": "B-dul Primaverii",
+      "id": 39,
+      "price": 400,
+      "base_rent": 50,
+      "full_group_rent": 100,
+      "house_rent": [200, 600, 1400, 1700],
+      "hotel_rent": 2000,
+      "mortage": 200,
+      "buyback_price": 220
+    }
+  ],
+  "house_cost": 200,
+  "hotel_cost": 200
+}

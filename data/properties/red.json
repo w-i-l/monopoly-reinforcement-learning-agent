@@ -1,0 +1,42 @@
+{
+  "group": "red",
+  "color": "#c3141b",
+  "indexes": [21, 23, 24],
+  "properties": [
+    {
+      "name": "B-dul Carol",
+      "id": 21,
+      "price": 220,
+      "base_rent": 18,
+      "full_group_rent": 36,
+      "house_rent": [90, 250, 700, 875],
+      "hotel_rent": 1050,
+      "mortage": 110,
+      "buyback_price": 121
+    },
+    {
+      "name": "B-dul Kogalniceanu",
+      "id": 23,
+      "price": 220,
+      "base_rent": 18,
+      "full_group_rent": 36,
+      "house_rent": [90, 250, 700, 875],
+      "hotel_rent": 1050,
+      "mortage": 110,
+      "buyback_price": 121
+    },
+    {
+      "name": "B-dul Eroilor",
+      "id": 24,
+      "price": 240,
+      "base_rent": 20,
+      "full_group_rent": 40,
+      "house_rent": [100, 300, 750, 925],
+      "hotel_rent": 1100,
+      "mortage": 120,
+      "buyback_price": 132
+    }
+  ],
+  "house_cost": 150,
+  "hotel_cost": 150
+}

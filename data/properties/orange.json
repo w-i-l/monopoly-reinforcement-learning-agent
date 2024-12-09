@@ -1,0 +1,42 @@
+{
+  "group": "orange",
+  "color": "#d39423",
+  "indexes": [16, 18, 19],
+  "properties": [
+    {
+      "name": "B-dul Timisoara",
+      "id": 16,
+      "price": 180,
+      "base_rent": 14,
+      "full_group_rent": 28,
+      "house_rent": [70, 200, 550, 750],
+      "hotel_rent": 950,
+      "mortage": 90,
+      "buyback_price": 99
+    },
+    {
+      "name": "B-dul Brasov",
+      "id": 18,
+      "price": 180,
+      "base_rent": 14,
+      "full_group_rent": 28,
+      "house_rent": [70, 200, 550, 750],
+      "hotel_rent": 950,
+      "mortage": 90,
+      "buyback_price": 99
+    },
+    {
+      "name": "Drumul Taberei",
+      "id": 19,
+      "price": 200,
+      "base_rent": 16,
+      "full_group_rent": 32,
+      "house_rent": [80, 220, 600, 800],
+      "hotel_rent": 1000,
+      "mortage": 100,
+      "buyback_price": 110
+    }
+  ],
+  "house_cost": 100,
+  "hotel_cost": 100
+}

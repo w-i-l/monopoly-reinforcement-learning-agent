@@ -1,0 +1,79 @@
+[
+    {
+        "group": "taxes",
+        "indexes": [4, 38],
+        "properties": [
+            {
+                "id": 4,
+                "name": "Impozit pe Venit",
+                "tax": 200
+            },
+            {
+                "id": 38,
+                "name": "Taxa de Lux",
+                "tax": 100
+            }
+        ]
+    }, 
+
+    {
+        "group": "chance",
+        "indexes": [7, 22, 36],
+        "properties": [
+            {
+                "id": 7,
+                "name": "Sansa"
+            },
+            {
+                "id": 22,
+                "name": "Sansa"
+            },
+            {
+                "id": 36,
+                "name": "Sansa"
+            }
+        ]
+    },
+
+    {
+        "group": "community_chest",
+        "indexes": [2, 17, 33],
+        "properties": [
+            {
+                "id": 2,
+                "name": "Cufarul Comunitatii"
+            },
+            {
+                "id": 17,
+                "name": "Cufarul Comunitatii"
+            },
+            {
+                "id": 33,
+                "name": "Cufarul Comunitatii"
+            }
+        ]
+    },
+
+    {
+        "group": "main_tiles",
+        "indexes": [0, 10, 20, 30],
+        "properties": [
+            {
+                "id": 0,
+                "name": "Start"
+            },
+            {
+                "id": 10,
+                "name": "Inchisoare | Vizita"
+            },
+            {
+                "id": 20,
+                "name": "Parcare"
+            },
+            {
+                "id": 30,
+                "name": "Du-te la Inchisoare"
+            }
+        ]
+    }
+]

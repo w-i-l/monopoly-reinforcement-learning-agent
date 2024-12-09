@@ -1,0 +1,42 @@
+{
+  "group": "green",
+  "color": "#5aa757",
+  "indexes": [31, 32, 34],
+  "properties": [
+    {
+      "name": "Piata Unirii",
+      "id": 31,
+      "price": 300,
+      "base_rent": 26,
+      "full_group_rent": 52,
+      "house_rent": [130, 390, 900, 1100],
+      "hotel_rent": 1275,
+      "mortage": 150,
+      "buyback_price": 165
+    },
+    {
+      "name": "Cotroceni",
+      "id": 32,
+      "price": 300,
+      "base_rent": 26,
+      "full_group_rent": 52,
+      "house_rent": [130, 390, 900, 1100],
+      "hotel_rent": 1275,
+      "mortage": 150,
+      "buyback_price": 165
+    },
+    {
+      "name": "Calea Victoriei",
+      "id": 34,
+      "price": 320,
+      "base_rent": 28,
+      "full_group_rent": 56,
+      "house_rent": [150, 450, 1000, 1200],
+      "hotel_rent": 1400,
+      "mortage": 160,
+      "buyback_price": 176
+    }
+  ],
+  "house_cost": 200,
+  "hotel_cost": 200
+}

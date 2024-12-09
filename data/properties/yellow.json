@@ -1,0 +1,42 @@
+{
+  "group": "yellow",
+  "color": "#fdee01",
+  "indexes": [26, 27, 29],
+  "properties": [
+    {
+      "name": "B-dul Titulescu",
+      "id": 26,
+      "price": 260,
+      "base_rent": 22,
+      "full_group_rent": 44,
+      "house_rent": [110, 330, 800, 975],
+      "hotel_rent": 1150,
+      "mortage": 130,
+      "buyback_price": 143
+    },
+    {
+      "name": "B-dul 1 Mai",
+      "id": 27,
+      "price": 260,
+      "base_rent": 22,
+      "full_group_rent": 44,
+      "house_rent": [110, 330, 800, 975],
+      "hotel_rent": 1150,
+      "mortage": 130,
+      "buyback_price": 143
+    },
+    {
+      "name": "Calea Dorobantilor",
+      "id": 29,
+      "price": 280,
+      "base_rent": 24,
+      "full_group_rent": 48,
+      "house_rent": [120, 360, 850, 1025],
+      "hotel_rent": 1200,
+      "mortage": 140,
+      "buyback_price": 154
+    }
+  ],
+  "house_cost": 150,
+  "hotel_cost": 150
+}
