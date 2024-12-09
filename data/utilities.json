@@ -5,11 +5,11 @@
   "properties": [
     {
       "id": 12,
-      "name": "Uzina de Apa"
+      "name": "Uzina Electrica"
     },
     {
       "id": 28,
-      "name": "Uzina Electrica"
+      "name": "Uzina de Apa"
     }
   ],
   "price": 150,
