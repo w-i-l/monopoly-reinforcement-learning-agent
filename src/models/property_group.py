@@ -30,16 +30,16 @@ class PropertyGroup(Enum):
         if not hasattr(self, '_attr_cache'):
             groups_path = '../data/properties/'
             groups = [
-                group 
+                group
                 for group in os.listdir(format_path(groups_path)) 
-                if os.path.isdir(format_path(groups_path + group))
             ]
 
             attr = {}
             for group in groups:
                 with open(format_path(groups_path + group), 'r') as f:
                     data = json.load(f)
-                    attr[PropertyGroup[group]] = {
+                    group = group.replace('.json', '')
+                    attr[group] = {
                         'house_cost': data['house_cost'],
                         'hotel_cost': data['hotel_cost'],
                         'color': data['color']
@@ -48,12 +48,12 @@ class PropertyGroup(Enum):
 
     def house_cost(self) -> int:
         self._load_attributes()
-        return type(self)._attr_cache[self]['house_cost']
+        return type(self)._attr_cache[self.value]['house_cost']
     
     def hotel_cost(self) -> int:
         self._load_attributes()
-        return type(self)._attr_cache[self]['hotel_cost']
+        return type(self)._attr_cache[self.value]['hotel_cost']
     
     def color(self) -> str:
         self._load_attributes()
-        return type(self)._attr_cache[self]['color']
+        return type(self)._attr_cache[self.value]['color']

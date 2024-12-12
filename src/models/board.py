@@ -11,7 +11,6 @@ from utils.helper_functions import format_path
 class Board:
     def __init__(self):
         self.__load_tiles()
-        # print(*self.tiles, sep='\n')
 
     def __load_tiles(self):
         properties = self.__load_properties()
@@ -53,7 +52,17 @@ class Board:
     def has_landed_on_go_to_jail(self, position: int) -> bool:
         tile = self.tiles[position]
         return isinstance(tile, GoToJail)
+    
 
+    def get_properties_by_group(self, group: PropertyGroup) -> list[Property]:
+        return [property for property in self.tiles if isinstance(property, Property) and property.group == group]
+
+
+    def get_property_by_name(self, name: str) -> Property:
+        for tile in self.tiles:
+            if isinstance(tile, Property) and tile.name == name:
+                return tile
+        return None
 
     def __load_utilities(self):
         utilities = []
@@ -150,3 +159,10 @@ class Board:
 
 if __name__ == "__main__":
     board = Board()
+    for tile in board.tiles:
+        print(tile.id, tile.name, end=" ")
+        if hasattr(tile, 'group'):
+            print(tile.group.color())
+        else:
+            print()
+
