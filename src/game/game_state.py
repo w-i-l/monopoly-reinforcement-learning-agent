@@ -33,7 +33,7 @@ class GameState:
         self.doubles_rolled += 1 if dice[0] == dice[1] else 0
         if self.doubles_rolled == 3:
             self.in_jail[player] = True
-            self.player_positions[player] = Jail().id
+            self.player_positions[player] = self.board.get_jail_id()
             print(f"{player} rolled doubles 3 times and is sent to jail")
             return
         
@@ -98,12 +98,23 @@ class GameState:
         print(f"{player} bought {property} remaining balance: ${self.player_balances[player]}")
 
 
-    def mortgage_property(self, player: Player, property: Tile):
+    def mortage_property(self, player: Player, property: Tile):
+        print(f"{player} mortaging {property}")
         if property not in self.is_owned:
             raise Exception("Property not owned")
         
+        if property in self.mortgaged_properties:
+            raise Exception("Property already mortgaged")
+        
+        if property not in self.properties[player]:
+            raise Exception("Property not owned by current player")
+        
+        if isinstance(property, Property) and (self.houses[property.group][0] > 0 or self.hotels[property.group][0] > 0):
+            raise Exception("Property has houses/hotels")
+        
         self.is_owned.remove(property)
         self.mortgaged_properties.add(property)
+        self.properties[player].remove(property)
         self.player_balances[player] += property.mortage
 
 
@@ -112,6 +123,116 @@ class GameState:
         self.doubles_rolled = 0
 
 
+    def place_house(self, player: Player, property_group: PropertyGroup):
+        if self.houses[property_group][0] == 4:
+            raise Exception("Max houses already placed")
+        
+        group_properties = self.board.get_properties_by_group(property_group)
+        if not all(property in self.properties[player] for property in group_properties):
+            raise Exception("Not all properties owned")
+        
+        cost = property_group.house_cost() * len(group_properties)
+        if self.player_balances[player] < cost:
+            raise NotEnoughBalanceException(cost, self.player_balances[player])
+        
+        print(f"{player} placed a house on {property_group}")
+        self.houses[property_group] = (self.houses[property_group][0] + 1, player)
+        self.player_balances[player] -= cost
+
+
+    def place_hotel(self, player: Player, property_group: PropertyGroup):
+        if self.hotels[property_group][0] == 1:
+            raise Exception("Max hotels already placed")
+        
+        group_properties = self.board.get_properties_by_group(property_group)
+        if not all(property in self.properties[player] for property in group_properties):
+            raise Exception("Not all properties owned")
+        
+        if self.houses[property_group][0] < 4:
+            raise Exception("Not all houses placed")
+        
+        cost = property_group.hotel_cost()
+        if self.player_balances[player] < cost:
+            raise NotEnoughBalanceException(cost, self.player_balances[player])
+        
+        self.hotels[property_group] = (1, player)
+        self.houses[property_group] = (0, None)
+        self.player_balances[player] -= cost
+
+
+    def sell_house(self, player: Player, property_group: PropertyGroup):
+        if self.houses[property_group][0] == 0:
+            raise Exception("No houses to sell")
+        
+        if self.houses[property_group][1] != player:
+            raise Exception("Not owner of houses")
+        
+        group_properties = self.board.get_properties_by_group(property_group)
+        cost = property_group.house_cost() * len(group_properties) // 2
+        self.houses[property_group] = (self.houses[property_group][0] - 1, player)
+        self.player_balances[player] += cost
+
+
+    def sell_hotel(self, player: Player, property_group: PropertyGroup):
+        if self.hotels[property_group][0] == 0:
+            raise Exception("No hotels to sell")
+        
+        if self.hotels[property_group][1] != player:
+            raise Exception("Not owner of hotels")
+        
+        group_properties = self.board.get_properties_by_group(property_group)
+        cost = property_group.hotel_cost() // 2
+        self.hotels[property_group] = (0, None)
+        self.houses[property_group] = (4, player)
+        self.player_balances[player] += cost
+
+
+    def use_escape_jail_card(self, player: Player):
+        if self.escape_jail_cards[player] == 0:
+            raise Exception("No escape jail card")
+        
+        self.escape_jail_cards[player] -= 1
+        self.in_jail[player] = False
+        self.player_positions[player] = 10
+
+
+    def pay_rent(self, player: Player, property: Tile):
+        owner = None
+        for p in self.properties:
+            if property in self.properties[p]:
+                owner = p
+                break
+        
+        rent = property.base_rent
+        if isinstance(property, Property):
+            if all(property in self.properties[owner] for property in self.board.get_properties_by_group(property.group)):
+                rent = property.full_group_rent
+            else:
+                rent = property.house_rent[self.houses[property.group][0]] + property.hotel_rent * self.hotels[property.group][0]
+        
+        if self.player_balances[player] < rent:
+            raise NotEnoughBalanceException(rent, self.player_balances[player])
+        
+        self.player_balances[player] -= rent
+        self.player_balances[owner] += rent
+        print(f"{player} paid ${rent} rent to {owner}")
+
+
+    def get_houses_for_player(self, player: Player):
+        groups_owned = set(property.group for property in self.properties[player])
+        groups_with_houses = set(group for group in groups_owned if self.houses[group][0] > 0)
+        return {
+            property.id: self.houses[property.group][0] for property in self.properties[player] if property.group in groups_with_houses
+        }
+    
+    
+    def get_hotels_for_player(self, player: Player):
+        groups_owned = set(property.group for property in self.properties[player])
+        groups_with_hotels = set(group for group in groups_owned if self.hotels[group][0] > 0)
+        return {
+            property.id: self.hotels[property.group][0] for property in self.properties[player] if property.group in groups_with_hotels
+        }
+    
 if __name__ == "__main__":
     players = [Player("Player 1"), Player("Player 2")]
     game_state = GameState(players)
