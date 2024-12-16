@@ -10,7 +10,7 @@ class DiceManager:
         if len(self.cache) > 0:
             return tuple(self.cache.pop())
         
-        self.cache = self.__set_cache()
+        self.cache = self.__get_cache()
         return tuple(self.cache.pop())
     
     
