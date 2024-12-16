@@ -9,6 +9,8 @@ from models.other_tiles import Jail, Go, GoToJail, FreeParking, Taxes, Chance, C
 from models.board import Board
 from game.game_validation import GameValidation
 
+# TODO: implement verification for all paths
+
 class GameState:
     def __init__(self, players: list[Player]):
         self.players = players
@@ -51,8 +53,8 @@ class GameState:
     def pay_players(self, player: Player, amount: int):
         for other_player in self.players:
             if other_player != player:
-                self.player_balances[other_player] += amount
                 self.player_balances[player] -= amount
+                self.player_balances[other_player] += amount
                 print(f"{player} paid {other_player} ${amount}")
 
 
@@ -131,24 +133,43 @@ class GameState:
             raise error
         
         if property in self.mortgaged_properties:
-            self.mortgaged_properties.remove(property)
-            self.player_balances[player] -= property.buyback_price
-            self.is_owned.add(property)
+            owner = None
+            for p in self.properties:
+                if property in self.properties[p]:
+                    owner = p
+                    break
+            
+            if owner == player:
+                self.mortgaged_properties.remove(property)
+                self.player_balances[player] -= property.buyback_price
+                print(f"{player} remove mortgage from {property}")
+
+            else:
+                self.player_balances[player] -= property.buyback_price
+                self.player_balances[player] -= property.price
+                self.player_balances[owner] += property.price
+                self.properties[owner].remove(property)
+                self.properties[player].append(property)
+                self.is_owned.add(property)
+                self.mortgaged_properties.remove(property)
+                print(f"{player} bought mortgaged {property} from {owner} for ${property.price}")
         else:
             self.properties[player].append(property)
             self.is_owned.add(property)
             self.player_balances[player] -= property.price
-        print(f"{player} bought {property} remaining balance: ${self.player_balances[player]}")
 
-    def mortage_property(self, player: Player, property: Tile):
+        print(f"{player} bought {property} remaining balance: ${self.player_balances[player]}")
+        print(self.properties)
+
+    def mortgage_property(self, player: Player, property: Tile):
+        print(property)
+        print(self.is_owned)    
         if error := GameValidation.validate_mortgage_property(self, player, property):
             raise error
         
         print(f"{player} mortaging {property}")
-        self.is_owned.remove(property)
         self.mortgaged_properties.add(property)
-        self.properties[player].remove(property)
-        self.player_balances[player] += property.mortage
+        self.player_balances[player] += property.mortgage
 
     def change_turn(self):
         self.current_player_index = (self.current_player_index + 1) % len(self.players)
@@ -268,7 +289,14 @@ class GameState:
         # TODO: Add dice roll to validate rent for utilities
         dice = 4
 
-        if error := GameValidation.validate_pay_rent(self, player, property, dice):
+        if error := GameValidation.validate_pay_rent(
+            self,
+            player, 
+            property, 
+            dice,
+            utility_factor_multiplier,
+            railway_factor_multiplier
+            ):
             raise error
         
         owner = next(p for p in self.properties if property in self.properties[p])
@@ -277,15 +305,17 @@ class GameState:
             rent = property.base_rent
             if all(property in self.properties[owner] for property in self.board.get_properties_by_group(property.group)):
                 rent = property.full_group_rent
-            else:
-                rent = (property.house_rent[self.houses[property.group][0]] + 
-                       property.hotel_rent * self.hotels[property.group][0])
+            elif self.hotels[property.group][0] > 0:
+                rent = property.hotel_rent
+            elif self.houses[property.group][0] > 0:
+                rent = property.house_rent[self.houses[property.group - 1][0]]
                 
         elif isinstance(property, Railway):
-            rent = property.price
+            rent_index = -1
             for prop in self.properties[owner]:
                 if isinstance(prop, Railway):
-                    rent *= 2
+                    rent_index += 1
+            rent = property.rent[rent_index]
 
             if railway_factor_multiplier:
                 rent *= railway_factor_multiplier
