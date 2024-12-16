@@ -20,7 +20,7 @@ class RandomAgent(Player):
         price = property.price
 
         if budget >= price:
-            return True
+            return random.choice([True, False])
         return False
     
     

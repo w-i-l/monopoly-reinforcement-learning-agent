@@ -23,3 +23,8 @@ class ErrorLogger:
         traceback.print_exc()
         print("******* END TRACEBACK *******")
         print()
+
+        with open("../data/errors.log", "a") as f:
+            f.write(f"{error}\n")
+            traceback.print_exc(file=f)
+            f.write("\n\n")

@@ -140,7 +140,7 @@ class GameValidation:
             return NotInJailException(str(player))
 
         if game_state.player_balances[player] < game_state.board.get_jail_fine():
-            return NotEnoughBalanceException(game_state.jail_fine, game_state.player_balances[player])
+            return NotEnoughBalanceException(game_state.board.get_jail_fine(), game_state.player_balances[player])
         
         return None
     
@@ -184,7 +184,7 @@ class GameValidation:
             elif game_state.hotels[property.group][0] > 0:
                 rent = property.hotel_rent
             elif game_state.houses[property.group][0] > 0:
-                rent = property.house_rent[game_state.houses[property.group - 1][0]]
+                rent = property.house_rent[game_state.houses[property.group][0] - 1]
         
         elif isinstance(property, Railway):
             rent_index = -1

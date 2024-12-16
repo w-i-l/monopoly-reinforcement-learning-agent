@@ -308,7 +308,7 @@ class GameState:
             elif self.hotels[property.group][0] > 0:
                 rent = property.hotel_rent
             elif self.houses[property.group][0] > 0:
-                rent = property.house_rent[self.houses[property.group - 1][0]]
+                rent = property.house_rent[self.houses[property.group][0] - 1]
                 
         elif isinstance(property, Railway):
             rent_index = -1

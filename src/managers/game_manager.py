@@ -6,6 +6,7 @@ from managers.chance_manager import ChanceManager
 from managers.community_chest_manager import CommunityChestManager
 from exceptions.exceptions import *
 from models.other_tiles import Chance, CommunityChest
+from utils.logger import ErrorLogger
 
 class GameManager:
     def __init__(self, players: List[Player]):
@@ -71,7 +72,10 @@ class GameManager:
                 print("Performing chance card action", chance_card)
                 chance_card.action(*chance_card.args)
             except Exception as e:
-                print(e)
+                if isinstance(e, NotEnoughBalanceException):
+                    raise e
+                
+                ErrorLogger.log_error(e)
                 print("Error in chance card action")
                 return -1
 
@@ -81,7 +85,10 @@ class GameManager:
                 print("Performing community chest card action", community_chest_card)
                 community_chest_card.action(*community_chest_card.args)
             except Exception as e:
-                print(e)
+                if isinstance(e, NotEnoughBalanceException):
+                    raise e
+                
+                ErrorLogger.log_error(e)
                 print("Error in community chest card action")
                 return -1
         
@@ -93,9 +100,12 @@ class GameManager:
            tile not in self.game_state.mortgaged_properties:
             try:
                 self.game_state.pay_rent(current_player, tile)
-            except NotEnoughBalanceException as e:
+            except Exception as e:
+                if isinstance(e, NotEnoughBalanceException):
+                    raise e
+                
                 # TODO: Handle player bankruptcy
-                print(e)
+                ErrorLogger.log_error(e)
                 print("Player does not have enough balance to pay rent")
                 return -1
 
@@ -104,9 +114,12 @@ class GameManager:
             if current_player.should_buy_property(self.game_state, tile):
                 try:
                     self.game_state.buy_property(current_player, tile)
-                except NotEnoughBalanceException as e:
+                except Exception as e:
+                    if isinstance(e, NotEnoughBalanceException):
+                        raise e
+                
                     # TODO: Handle player bankruptcy
-                    print(e)
+                    ErrorLogger.log_error(e)
                     print("Player does not have enough balance to buy the property")
                     return -1
 
@@ -117,9 +130,12 @@ class GameManager:
         for suggestion in suggestions:
             try:
                 self.game_state.downgrade_property_group(current_player, suggestion)
-            except NotEnoughBalanceException as e:
+            except Exception as e:
+                if isinstance(e, NotEnoughBalanceException):
+                    raise e
+                
                 # TODO: Handle player bankruptcy
-                print(e)
+                ErrorLogger.log_error(e)
                 print("Player does not have enough balance to downgrade the property")
                 return -1
 
@@ -130,9 +146,12 @@ class GameManager:
         for suggestion in suggestions:
             try:
                 self.game_state.mortgage_property(current_player, suggestion)
-            except NotEnoughBalanceException as e:
+            except Exception as e:
+                if isinstance(e, NotEnoughBalanceException):
+                    raise e
+                
                 # TODO: Handle player bankruptcy
-                print(e)
+                ErrorLogger.log_error(e)
                 print("Player does not have enough balance to mortgage the property")
                 return -1
                 
@@ -142,9 +161,12 @@ class GameManager:
         for suggestion in suggestions:
             try:
                 self.game_state.update_property_group(current_player, suggestion)
-            except NotEnoughBalanceException as e:
+            except Exception as e:
+                if isinstance(e, NotEnoughBalanceException):
+                    raise e
+                
                 # TODO: Handle player bankruptcy
-                print(e)
+                ErrorLogger.log_error(e)
                 print("Player does not have enough balance to upgrade the property")
                 return -1
 
@@ -167,13 +189,20 @@ if __name__ == "__main__":
     game_manager = GameManager(players)
     can_continue = True
 
-    tourns = 0
-    while can_continue:
-        tourns += 1
-        can_continue = game_manager.play_turn()
-        can_continue = True if can_continue == None else False
-        game_manager.change_turn()
-        print(tourns)
+    for _ in range(10000):
+        tourns = 0
+        while can_continue:
+            tourns += 1
+            try:
+                can_continue = game_manager.play_turn()
+            except NotEnoughBalanceException as e:
+                print(e)
+                print("GAME OVER")
+                break
+            can_continue = True if can_continue == None else False
+            game_manager.change_turn()
+            print(tourns)
+
     print(game_manager.game_state.houses)
     print(game_manager.game_state.hotels)
     print(game_manager.game_state.player_balances)
