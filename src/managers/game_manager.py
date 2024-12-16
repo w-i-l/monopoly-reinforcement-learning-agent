@@ -1,9 +1,9 @@
 from typing import List
 from game.player import Player
 from game.game_state import GameState
-from game.dice_manager import DiceManager
-from game.chance_manager import ChanceManager
-from game.community_chest_manager import CommunityChestManager
+from managers.dice_manager import DiceManager
+from managers.chance_manager import ChanceManager
+from managers.community_chest_manager import CommunityChestManager
 from exceptions.exceptions import *
 from models.other_tiles import Chance, CommunityChest
 
