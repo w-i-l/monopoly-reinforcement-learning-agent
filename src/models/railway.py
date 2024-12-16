@@ -10,7 +10,7 @@ class Railway(Tile):
                 data = json.load(f)
                 cls._attr_cache = (
                     data['price'],
-                    data['mortage'],
+                    data['mortgage'],
                     data['buyback_price'],
                     data['rent']
                 )
@@ -18,7 +18,7 @@ class Railway(Tile):
 
     def __init__(self, id: int, name: str):
         super().__init__(id, name)
-        self.price, self.mortage, self.buyback_price, self.rent = self._load_attributes()
+        self.price, self.mortgage, self.buyback_price, self.rent = self._load_attributes()
 
     def __repr__(self):
         return f"{self.name} (Railway)"

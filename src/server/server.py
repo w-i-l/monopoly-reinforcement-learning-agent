@@ -8,7 +8,7 @@ from server_models.game_state_response import GameStateResponse
 from server_models.player_state import PlayerState
 from models.property_group import PropertyGroup
 from server_models.property import Property
-from server_models.mortage_request import MortagingRequest
+from server_models.mortgage_request import MortagingRequest
 import random
 from server_utils.logger import ErrorLogger
 from game.dice_manager import DiceManager
@@ -64,13 +64,13 @@ async def get_game_state():
         } for player in game_state.players]
         
         owned_properties = [prop.id for prop in game_state.is_owned]
-        mortaged_properties = [prop.id for prop in game_state.mortgaged_properties]
+        mortgaged_properties = [prop.id for prop in game_state.mortgaged_properties]
 
         return {
             'players': players,
             'currentPlayer': game_state.current_player_index,
             'ownedProperties': owned_properties,
-            'mortagedProperties': mortaged_properties
+            'mortgagedProperties': mortgaged_properties
         }
     except Exception as e:
         ErrorLogger.log_error(e)
@@ -138,13 +138,13 @@ async def pay_rent():
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/api/mortgage-property")
-async def mortage_property(request: MortagingRequest):
+async def mortgage_property(request: MortagingRequest):
     try:
         current_player = game_state.players[game_state.current_player_index]
         property_name = request.property_name
         property_name = property_name.split(' ')[0]
         property = game_state.board.get_property_by_name(property_name)
-        game_state.mortage_property(current_player, property)
+        game_state.mortgage_property(current_player, property)
         return {
             'success': True,
             'balance': game_state.player_balances[current_player],

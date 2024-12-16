@@ -10,14 +10,14 @@ class Utility(Tile):
                 data = json.load(f)
                 cls._attr_cache = (
                     data['price'],
-                    data['mortage'],
+                    data['mortgage'],
                     data['buyback_price']
                 )
         return cls._attr_cache
 
     def __init__(self, id: int, name: str):
         super().__init__(id, name)
-        self.price, self.mortage, self.buyback_price = self._load_attributes()
+        self.price, self.mortgage, self.buyback_price = self._load_attributes()
 
     def __repr__(self):
         return f"{self.name} (Utility)"

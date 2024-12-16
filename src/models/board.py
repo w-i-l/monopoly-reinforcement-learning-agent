@@ -71,7 +71,7 @@ class Board:
                 return tile
         return None
     
-    
+
     def get_utilities(self) -> list[Utility]:
         return [utility for utility in self.tiles if isinstance(utility, Utility)]
     
@@ -126,9 +126,9 @@ class Board:
                     full_group_rent = property['full_group_rent']
                     house_rent = property['house_rent']
                     hotel_rent = property['hotel_rent']
-                    mortage = property['mortage']
+                    mortgage = property['mortgage']
                     buyback_price = property['buyback_price']
-                    _properties.append(Property(id, name, group, price, base_rent, full_group_rent, house_rent, hotel_rent, mortage, buyback_price))
+                    _properties.append(Property(id, name, group, price, base_rent, full_group_rent, house_rent, hotel_rent, mortgage, buyback_price))
 
         return _properties
     

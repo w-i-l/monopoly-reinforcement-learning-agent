@@ -7,4 +7,4 @@ class GameStateResponse(BaseModel):
     players: List[PlayerState]
     currentPlayer: int
     ownedProperties: Set[int]
-    mortagedProperties: Set[int]
+    mortgagedProperties: Set[int]

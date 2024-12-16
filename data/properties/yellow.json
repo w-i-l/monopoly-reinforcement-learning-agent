@@ -11,7 +11,7 @@
       "full_group_rent": 44,
       "house_rent": [110, 330, 800, 975],
       "hotel_rent": 1150,
-      "mortage": 130,
+      "mortgage": 130,
       "buyback_price": 143
     },
     {
@@ -22,7 +22,7 @@
       "full_group_rent": 44,
       "house_rent": [110, 330, 800, 975],
       "hotel_rent": 1150,
-      "mortage": 130,
+      "mortgage": 130,
       "buyback_price": 143
     },
     {
@@ -33,7 +33,7 @@
       "full_group_rent": 48,
       "house_rent": [120, 360, 850, 1025],
       "hotel_rent": 1200,
-      "mortage": 140,
+      "mortgage": 140,
       "buyback_price": 154
     }
   ],

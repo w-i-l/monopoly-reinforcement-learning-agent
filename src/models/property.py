@@ -13,7 +13,7 @@ class Property(Tile):
             full_group_rent: int,
             house_rent: list[int],
             hotel_rent: int,
-            mortage: int,
+            mortgage: int,
             buyback_price: int
     ):
         super().__init__(id, name)
@@ -23,7 +23,7 @@ class Property(Tile):
         self.full_group_rent = full_group_rent
         self.house_rent = house_rent
         self.hotel_rent = hotel_rent
-        self.mortage = mortage
+        self.mortgage = mortgage
         self.buyback_price = buyback_price
 
     def __repr__(self):

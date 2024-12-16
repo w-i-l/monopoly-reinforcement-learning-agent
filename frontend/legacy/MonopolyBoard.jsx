@@ -78,7 +78,9 @@ const MortgagePropertyModal = ({
       className="bg-white p-6 rounded-lg shadow-lg max-w-md mx-auto mt-20"
       overlayClassName="fixed inset-0 bg-black bg-opacity-50"
     >
-      <h2 className="text-xl font-bold mb-4 text-black">Select a Property to Mortgage</h2>
+      <h2 className="text-xl font-bold mb-4 text-black">
+        Select a Property to Mortgage
+      </h2>
       <select
         value={selectedProperty}
         onChange={(e) => setSelectedProperty(e.target.value)}
@@ -201,7 +203,7 @@ const MonopolyBoard = () => {
 
     mortgageProperty: async (propertyName) => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/mortage-property`, {
+        const response = await fetch(`${API_BASE_URL}/api/mortgage-property`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ property_name: propertyName }),
@@ -301,7 +303,7 @@ const MonopolyBoard = () => {
       } catch (error) {
         setError(error.message);
       }
-    }
+    },
   };
 
   useEffect(() => {
@@ -313,7 +315,7 @@ const MonopolyBoard = () => {
     const playersHere = players.filter((p) => p.position === index);
     const playersColors = ["red", "blue", "green", "purple"];
     const isOwned = gameState.ownedProperties.includes(property.id);
-    const isMortgaged = gameState.mortagedProperties.includes(property.id);
+    const isMortgaged = gameState.mortgagedProperties.includes(property.id);
 
     return (
       <div
@@ -429,30 +431,30 @@ const MonopolyBoard = () => {
                 className="bg-gray-500 text-white px-4 py-2 rounded disabled:opacity-50 hover:bg-gray-600"
                 onClick={() => actions.placeHouse("Rahova (brown)")}
                 disabled={!lastRoll}
-                >
+              >
                 Buy House
-                </button>
+              </button>
               <button
                 className="bg-gray-500 text-white px-4 py-2 rounded disabled:opacity-50 hover:bg-gray-600"
                 onClick={() => actions.placeHotel("Rahova (brown)")}
                 disabled={!lastRoll}
-                >
+              >
                 Buy Hotel
-                </button>
+              </button>
               <button
                 className="bg-gray-500 text-white px-4 py-2 rounded disabled:opacity-50 hover:bg-gray-600"
                 onClick={() => actions.sellHouse("Rahova (brown)")}
                 disabled={!lastRoll}
-                >
+              >
                 Sell House
-                </button>
+              </button>
               <button
                 className="bg-gray-500 text-white px-4 py-2 rounded disabled:opacity-50 hover:bg-gray-600"
                 onClick={() => actions.sellHotel("Rahova (brown)")}
                 disabled={!lastRoll}
-                >
+              >
                 Sell Hotel
-                </button>
+              </button>
             </div>
           </div>
         </div>
