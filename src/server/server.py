@@ -11,6 +11,7 @@ from server_models.property import Property
 from server_models.mortage_request import MortagingRequest
 import random
 from server_utils.logger import ErrorLogger
+from game.dice import DiceManager
 
 # Initialize FastAPI app
 app = FastAPI(title="Monopoly Game API")
@@ -27,24 +28,25 @@ app.add_middleware(
 # Initialize game state
 players = [Player("Player 1"), Player("Player 2")]
 game_state = GameState(players)
+dice_manager = DiceManager()
 
 # brown_properties = game_state.board.get_properties_by_group(PropertyGroup.BROWN)
 # game_state.properties[players[0]] = list(brown_properties)
 # game_state.is_owned.update(brown_properties)
 # game_state.houses[PropertyGroup.BROWN] = (3, 0)
 
-for group in PropertyGroup:
-    # Skip non-property groups like RAILROAD and UTILITY
-        # Get properties for this group
-    group_properties = game_state.board.get_properties_by_group(group)
-    # Assign properties to player 0
-    game_state.properties[players[0]].extend(list(group_properties))
-    # Mark properties as owned
-    game_state.is_owned.update(group_properties)
-    # Set 3 houses for each group
-    game_state.houses[group] = (3, 0)  # (player0_houses, player1_houses)
-    game_state.hotels[group] = (1, 0)  # (player0_hotels, player1_hotels)
-game_state.doubles_rolled = 2
+# for group in PropertyGroup:
+#     # Skip non-property groups like RAILROAD and UTILITY
+#         # Get properties for this group
+#     group_properties = game_state.board.get_properties_by_group(group)
+#     # Assign properties to player 0
+#     game_state.properties[players[0]].extend(list(group_properties))
+#     # Mark properties as owned
+#     game_state.is_owned.update(group_properties)
+#     # Set 3 houses for each group
+#     game_state.houses[group] = (3, 0)  # (player0_houses, player1_houses)
+#     game_state.hotels[group] = (1, 0)  # (player0_hotels, player1_hotels)
+# game_state.doubles_rolled = 2
 
 
 @app.get("/api/game-state", response_model=GameStateResponse)
@@ -77,7 +79,7 @@ async def get_game_state():
 @app.post("/api/roll-dice")
 async def roll_dice():
     try:
-        dice = (random.randint(1, 6), random.randint(1, 6))
+        dice = dice_manager.roll()
         current_player = game_state.players[game_state.current_player_index]
         
         game_state.move_player(current_player, dice)
