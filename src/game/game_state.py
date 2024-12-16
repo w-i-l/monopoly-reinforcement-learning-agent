@@ -250,6 +250,14 @@ class GameState:
         self.player_balances[player] += amount
         print(f"{player} received ${amount}")
 
+    
+    def receive_from_players(self, player: Player, amount: int):
+        for other_player in self.players:
+            if other_player != player:
+                self.player_balances[other_player] -= amount
+                self.player_balances[player] += amount
+                print(f"{player} received ${amount} from {other_player}")
+
     def pay_rent(
             self, 
             player: Player, 
