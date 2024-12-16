@@ -86,3 +86,8 @@ class NotEnoughBalanceException(GameException):
     def __init__(self, price: int, balance: int):
         self.message = f"Not enough balance to complete the transaction. Price: {price}, Balance: {balance}"
         super().__init__(self.message)
+
+class MortgagePropertyRentException(GameException):
+    def __init__(self, property_name: str):
+        self.message = f"Cannot pay rent on mortgaged property {property_name}"
+        super().__init__(self.message)

@@ -46,7 +46,8 @@ class ChanceManager:
 
         # Pay rent or buy the utility
         if utility in game_state.is_owned and \
-            not utility in game_state.properties[player]:
+            not utility in game_state.properties[player] and\
+            not utility in game_state.mortgaged_properties:
             game_state.pay_rent(player, utility, utility_factor_multiplier=10)
         else:
             if player.should_buy_property(game_state, utility):
@@ -108,7 +109,8 @@ class ChanceManager:
 
         # Pay rent or buy the railway
         if railway in game_state.is_owned and \
-            not railway in game_state.properties[player]:
+            not railway in game_state.properties[player] and\
+            not railway in game_state.mortgaged_properties:
             game_state.pay_rent(player, railway, railway_factor_multiplier)
         else:
             if player.should_buy_property(game_state, railway):
@@ -128,7 +130,8 @@ class ChanceManager:
         current_player_position = game_state.player_positions[player]
         tile = game_state.board.tiles[current_player_position]
         if tile in game_state.is_owned and \
-            not tile in game_state.properties[player]:
+            not tile in game_state.properties[player] and\
+            not tile in game_state.mortgaged_properties:
             game_state.pay_rent(player, tile)
 
 
@@ -140,7 +143,8 @@ class ChanceManager:
         game_state.move_player_to_property(player, property_tile)
 
         if property_tile in game_state.is_owned and \
-            not property_tile in game_state.properties[player]:
+            not property_tile in game_state.properties[player] and\
+            not property_tile in game_state.mortgaged_properties:
             game_state.pay_rent(player, property_tile)
         else:
             if player.should_buy_property(game_state, property_tile):

@@ -17,16 +17,32 @@ else:
 class GameValidation:
     @staticmethod
     def validate_buy_property(game_state: GameState, player: Player, property: Tile) -> Optional[GameException]:
-        if property in game_state.is_owned:
+        if property in game_state.is_owned and property not in game_state.mortgaged_properties:
             return PropertyAlreadyOwnedException(str(property))
+        
+        owner = None
+        for p in game_state.properties:
+            if property in game_state.properties[p]:
+                owner = p
+                break
+
+        if owner == player and property not in game_state.mortgaged_properties:
+            return PropertyAlreadyOwnedException(str(property))
+        elif owner == player and property in game_state.mortgaged_properties:
+            if game_state.player_balances[player] < property.buyback_price:
+                return NotEnoughBalanceException(property.buyback_price, game_state.player_balances[player])
+            
+        if owner != player and property in game_state.mortgaged_properties:
+            price = property.buyback_price + property.price
+            if game_state.player_balances[player] < price:
+                return NotEnoughBalanceException(price, game_state.player_balances[player])
         
         if game_state.player_balances[player] < property.price:
             return NotEnoughBalanceException(property.price, game_state.player_balances[player])
         
-        if property in game_state.mortgaged_properties:
-            if game_state.player_balances[player] < property.buyback_price:
-                return NotEnoughBalanceException(property.buyback_price, game_state.player_balances[player])
-        
+        if property in game_state.properties[player]:
+            return PropertyAlreadyOwnedException(str(property))
+
         return None
 
     @staticmethod
@@ -136,7 +152,18 @@ class GameValidation:
         return None
 
     @staticmethod
-    def validate_pay_rent(game_state: GameState, player: Player, property: Tile, dice: int) -> Optional[GameException]:
+    def validate_pay_rent(
+        game_state: GameState,
+        player: Player, 
+        property: Tile, 
+        dice: int,
+        utility_factor_multiplier: int = None,
+        railway_factor_multiplier: int = None
+        ) -> Optional[GameException]:
+
+        if property in game_state.mortgaged_properties:
+            return MortgagePropertyRentException(str(property))
+
         owner = None
         for p in game_state.properties:
             if property in game_state.properties[p]:
@@ -154,22 +181,29 @@ class GameValidation:
             if all(prop in game_state.properties[owner] 
                    for prop in game_state.board.get_properties_by_group(property.group)):
                 rent = property.full_group_rent
-            else:
-                rent = (property.house_rent[game_state.houses[property.group][0]] + 
-                       property.hotel_rent * game_state.hotels[property.group][0])
+            elif game_state.hotels[property.group][0] > 0:
+                rent = property.hotel_rent
+            elif game_state.houses[property.group][0] > 0:
+                rent = property.house_rent[game_state.houses[property.group - 1][0]]
         
         elif isinstance(property, Railway):
-            rent = property.price
+            rent_index = -1
             for prop in game_state.properties[owner]:
                 if isinstance(prop, Railway):
-                    rent *= 2
+                    rent_index += 1
+            rent = property.rent[rent_index]
+            if railway_factor_multiplier:
+                rent *= railway_factor_multiplier
 
         elif isinstance(property, Utility):
-            rent = 4 * dice
-            for prop in game_state.properties[owner]:
-                if isinstance(prop, Utility):
-                    rent = 10 * dice
-        
+            if utility_factor_multiplier:
+                rent = utility_factor_multiplier * dice
+            else:
+                rent = 4 * dice
+                for prop in game_state.properties[owner]:
+                    if isinstance(prop, Utility):
+                        rent = 10 * dice
+            
         if game_state.player_balances[player] < rent:
             return NotEnoughBalanceException(rent, game_state.player_balances[player])
         
