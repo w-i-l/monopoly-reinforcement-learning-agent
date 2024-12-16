@@ -63,6 +63,26 @@ class Board:
             if isinstance(tile, Property) and tile.name == name:
                 return tile
         return None
+    
+
+    def get_tile_by_name(self, name: str) -> Tile:
+        for tile in self.tiles:
+            if tile.name == name:
+                return tile
+        return None
+    
+    
+    def get_utilities(self) -> list[Utility]:
+        return [utility for utility in self.tiles if isinstance(utility, Utility)]
+    
+    def get_railways(self) -> list[Railway]:
+        return [railway for railway in self.tiles if isinstance(railway, Railway)]
+    
+    def get_jail_fine(self) -> int:
+        for tile in self.tiles:
+            if isinstance(tile, Jail):
+                return tile.fine
+        return -1
 
     def __load_utilities(self):
         utilities = []

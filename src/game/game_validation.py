@@ -100,6 +100,13 @@ class GameValidation:
             return NotImprovementOwnerException("hotel", str(property_group), str(player))
         
         return None
+    
+    @staticmethod
+    def validate_get_out_of_jail(game_state: GameState, player: Player) -> Optional[GameException]:
+        if not game_state.in_jail[player]:
+            return NotInJailException(str(player))
+        
+        return None 
 
     @staticmethod
     def validate_use_escape_jail_card(game_state: GameState, player: Player) -> Optional[GameException]:
@@ -108,6 +115,23 @@ class GameValidation:
         
         if not game_state.in_jail[player]:
             return NotInJailException(str(player))
+        
+        return None
+    
+    @staticmethod
+    def validate_pay_get_out_of_jail_fine(game_state: GameState, player: Player) -> Optional[GameException]:
+        if not game_state.in_jail[player]:
+            return NotInJailException(str(player))
+
+        if game_state.player_balances[player] < game_state.board.get_jail_fine():
+            return NotEnoughBalanceException(game_state.jail_fine, game_state.player_balances[player])
+        
+        return None
+    
+    @staticmethod
+    def validate_pay_tax(game_state: GameState, player: Player, tax: int) -> Optional[GameException]:
+        if game_state.player_balances[player] < tax:
+            return NotEnoughBalanceException(tax, game_state.player_balances[player])
         
         return None
 

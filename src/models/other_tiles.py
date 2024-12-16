@@ -34,6 +34,7 @@ class GoToJail(Tile):
 class Jail(Tile):
     def __init__(self, id: int, name: str):
         super().__init__(id, name)
+        self.fine = 50
 
     def __repr__(self):
         return f"{self.name} (Jail)"
