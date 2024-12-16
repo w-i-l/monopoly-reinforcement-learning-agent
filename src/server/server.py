@@ -11,7 +11,7 @@ from server_models.property import Property
 from server_models.mortage_request import MortagingRequest
 import random
 from server_utils.logger import ErrorLogger
-from game.dice import DiceManager
+from src.game.dice_manager import DiceManager
 
 # Initialize FastAPI app
 app = FastAPI(title="Monopoly Game API")
