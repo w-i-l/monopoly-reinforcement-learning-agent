@@ -29,26 +29,24 @@ class GameManager:
 
         # TODO: Verify if the player can play - check if the player is in jail
         if self.game_state.in_jail[current_player]:
-            if self.game_state.turns_in_jail[current_player] == 3:
+            # try to pay the fine
+            if current_player.should_pay_get_out_of_jail_fine(self.game_state):
                 self.game_state.pay_get_out_of_jail_fine(current_player)
 
+            # try to use the escape jail card
+            elif current_player.should_use_escape_jail_card(self.game_state):
+                self.game_state.use_escape_jail_card(current_player)
+
+            # try to roll a double
             else:
-                # try to pay the fine
-                if current_player.should_pay_get_out_of_jail_fine(self.game_state):
-                    self.game_state.pay_get_out_of_jail_fine(current_player)
-
-                # try to use the escape jail card
-                elif current_player.should_use_escape_jail_card(self.game_state):
-                    self.game_state.use_escape_jail_card(current_player)
-
-                # try to roll a double
+                dice_roll = self.dice_manager.roll()
+                if dice_roll[0] == dice_roll[1]:
+                    self.game_state.get_out_of_jail(current_player)
                 else:
-                    dice_roll = self.dice_manager.roll()
-                    if dice_roll[0] == dice_roll[1]:
-                        self.game_state.get_out_of_jail(current_player)
+                    if self.game_state.turns_in_jail[current_player] == 2:
+                        self.game_state.pay_get_out_of_jail_fine(current_player)
                     else:
                         self.game_state.count_turn_in_jail(current_player)
-                        return
 
 
         # Roll the dice
@@ -158,6 +156,7 @@ class GameManager:
 
         # Check if the player wants to upgrade properties
         suggestions = current_player.get_upgrading_suggestions(self.game_state)
+        print("Upgrading suggestions: ", suggestions)
         for suggestion in suggestions:
             try:
                 self.game_state.update_property_group(current_player, suggestion)
@@ -183,13 +182,23 @@ class GameManager:
 
 if __name__ == "__main__":
     from agents.random_agent import RandomAgent
+    from agents.human_agent import HumanAgent
     import time
+    from models.property_group import PropertyGroup
 
-    players = [RandomAgent("Player 1"), RandomAgent("Player 2")]
+    random_agent = RandomAgent("Random player")
+    human_player = HumanAgent("Human Player", port=6060)
+    players = [random_agent, human_player]
     game_manager = GameManager(players)
+    brown = game_manager.game_state.board.get_properties_by_group(PropertyGroup.BROWN)
+    game_manager.game_state.properties[human_player] = brown
+    game_manager.game_state.is_owned.update(brown)
+    game_manager.game_state.place_house(human_player, PropertyGroup.BROWN)
+
+    human_player.game_state = game_manager.game_state
     can_continue = True
 
-    for _ in range(10000):
+    for _ in range(1):
         tourns = 0
         while can_continue:
             tourns += 1
