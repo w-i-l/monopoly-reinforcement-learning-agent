@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import * as gameAPI from "../services/GameAPI";
+import areGameStateEqual from "../utils/compare_game_states";
 
 const useGameState = () => {
   const [gameState, setGameState] = useState(null);
@@ -9,25 +10,36 @@ const useGameState = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch game state
-  const fetchGameState = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const data = await gameAPI.fetchGameState();
-      setGameState(data);
-      setError(null);
-    } catch (error) {
-      setError(error.message);
-      setGameState(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+   const gameStateRef = useRef(null);
 
-  // Initial fetch
-  useEffect(() => {
-    fetchGameState();
-  }, [fetchGameState]);
+   const fetchGameState = useCallback(async () => {
+     try {
+       const data = await gameAPI.fetchGameState();
+       if (!areGameStateEqual(data, gameStateRef.current)) {
+         setGameState(data);
+         gameStateRef.current = data;
+         console.log("Game state updated");
+       } else {
+          console.log("Game state unchanged");
+       }
+     } catch (error) {
+       setError(error.message);
+     } finally {
+       setIsLoading(false);
+     }
+   }, []);
+
+   useEffect(() => {
+     fetchGameState();
+
+     const intervalId = setInterval(() => {
+       fetchGameState();
+     }, 500);
+
+     return () => {
+       clearInterval(intervalId);
+     };
+   }, [fetchGameState]);  
 
   // Game actions
   const actions = {
