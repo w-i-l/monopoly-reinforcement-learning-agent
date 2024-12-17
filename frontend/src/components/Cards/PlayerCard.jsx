@@ -23,9 +23,12 @@ const PlayerCard = ({ player, isCurrentPlayer }) => (
         <div>
           <p>Houses:</p>
           <ul className="list-disc pl-4">
-            {Object.entries(player.houses).map(([property, count]) => (
-              <li key={property}>{`${property}: ${count}`}</li>
-            ))}
+            {Object.entries(player.houses).map(([propertyId, count]) => {
+              const property = player.properties.find(prop => prop.id === parseInt(propertyId));
+              return (
+                <li key={propertyId}>{`${property.name}: ${count}`}</li>
+              );
+            })}
           </ul>
         </div>
       )}
@@ -33,9 +36,12 @@ const PlayerCard = ({ player, isCurrentPlayer }) => (
         <div>
           <p>Hotels:</p>
           <ul className="list-disc pl-4">
-            {Object.entries(player.hotels).map(([property, count]) => (
-              <li key={property}>{`${property}: ${count}`}</li>
-            ))}
+            {Object.entries(player.hotels).map(([propertyId, count]) => {
+              const property = player.properties.find(prop => prop.id === parseInt(propertyId));
+              return (
+                <li key={propertyId}>{`${property.name}: ${count}`}</li>
+              );
+            })}
           </ul>
         </div>
       )}
