@@ -12,7 +12,23 @@ const BoardSquare = ({
   hotels,
 }) => {
   const playersHere = players?.filter((p) => p.position === index) || [];
-  const playersColors = ["red", "blue", "green", "purple"];
+  const owner = () => {
+    let _owner = null;
+    players.forEach((p) => {
+      p.properties.forEach((prop) => {
+        if (prop.id === property.id) {
+          _owner = p;
+        }
+      });
+    });
+    console.log(_owner);
+    return _owner;
+  }
+  const getPlayerColor = (player) => {
+    const colors = ["red", "blue", "green", "purple"];
+    const playerId = players.findIndex((p) => p.name === player.name);
+    return colors[playerId];
+  }
   const isOwned = ownedProperties?.includes(property.id);
   const isMortgaged = mortgagedProperties?.includes(property.id);
 
@@ -73,7 +89,8 @@ const BoardSquare = ({
 
       {isOwned && (
         <div
-          className="absolute top-1 right-1 w-3 h-3 bg-yellow-400 rounded-full"
+          className="absolute top-1 left-1 w-3 h-3 rounded-full"
+          style={{ backgroundColor: getPlayerColor(owner()) }}
           title="Owned"
         />
       )}
@@ -83,13 +100,13 @@ const BoardSquare = ({
           key={i}
           className="absolute w-4 h-4 rounded-full flex items-center justify-center"
           style={{
-            backgroundColor: playersColors[Number(player.name.slice(-1)) % 4],
+            backgroundColor: getPlayerColor(player),
             top: `${i * 20 + 5}%`,
             right: "5%",
           }}
         >
           <span className="text-white text-xxs font-bold">
-            {player.name.slice(-1)}
+            {player.name.charAt(0)}
           </span>
         </div>
       ))}
