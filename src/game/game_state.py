@@ -334,7 +334,7 @@ class GameState:
         print(f"{player} paid ${rent} rent to {owner}")
 
     def get_houses_for_player(self, player: Player):
-        properties = filter(lambda p: isinstance(p, Property), self.properties[player])
+        properties = [p for p in self.properties[player] if isinstance(p, Property)]
         groups_owned = set(property.group for property in properties)
         groups_with_houses = set(group for group in groups_owned if self.houses[group][0] > 0)
         return {
@@ -342,9 +342,9 @@ class GameState:
             for property in properties 
             if property.group in groups_with_houses
         }
-    
+
     def get_hotels_for_player(self, player: Player):
-        properties = filter(lambda p: isinstance(p, Property), self.properties[player])
+        properties = [p for p in self.properties[player] if isinstance(p, Property)]
         groups_owned = set(property.group for property in properties)
         groups_with_hotels = set(group for group in groups_owned if self.hotels[group][0] > 0)
         return {

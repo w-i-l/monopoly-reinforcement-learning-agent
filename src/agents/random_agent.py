@@ -61,17 +61,14 @@ class RandomAgent(Player):
         properties = game_state.properties[self]
         properties = [property for property in properties if isinstance(property, Property)]
         properties = [property for property in properties if not property in game_state.mortgaged_properties]
-        print(properties)
         budget = game_state.player_balances[self]
         suggestions = []
 
-        print("mortgaging suggestions: ", properties)
         for property in properties:
             should_mortgage = random.choice([True, False])
             can_be_mortgaged = not game_state.houses[property.group][0] > 0 and not game_state.hotels[property.group][0] > 0
             if should_mortgage and can_be_mortgaged:
                 suggestions.append(property)
-                print("mortgaging suggestions: ", suggestions)
         return suggestions
     
 

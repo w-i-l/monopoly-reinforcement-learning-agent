@@ -51,10 +51,7 @@ class ChanceManager:
             game_state.pay_rent(player, utility, utility_factor_multiplier=10)
         else:
             if player.should_buy_property(game_state, utility):
-                try:
-                    game_state.buy_property(player, utility)
-                except Exception as e:
-                    print("Error", e)
+                game_state.buy_property(player, utility)
 
 
     def __pay_tax(self, game_state: GameState, player, tax: int):
@@ -114,10 +111,7 @@ class ChanceManager:
             game_state.pay_rent(player, railway, railway_factor_multiplier)
         else:
             if player.should_buy_property(game_state, railway):
-                try:
-                    game_state.buy_property(player, railway)
-                except Exception as e:
-                    print("Error", e)
+                game_state.buy_property(player, railway)
                 
 
     def __move_player_to_jail(self, game_state: GameState, player):
@@ -148,10 +142,7 @@ class ChanceManager:
             game_state.pay_rent(player, property_tile)
         else:
             if player.should_buy_property(game_state, property_tile):
-                try:
-                    game_state.buy_property(player, property_tile)
-                except Exception as e:
-                    print("Error", e)
+                game_state.buy_property(player, property_tile)
 
 
     def __receive_get_out_of_jail_card(self, game_state: GameState, player):

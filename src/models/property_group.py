@@ -57,3 +57,9 @@ class PropertyGroup(Enum):
     def color(self) -> str:
         self._load_attributes()
         return type(self)._attr_cache[self.value]['color']
+    
+    def __str__(self):
+        return self.value
+    
+    def __repr__(self):
+        return self.value
