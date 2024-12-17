@@ -1,10 +1,14 @@
-import React from 'react';
-import BoardSquare from './BoardSquare';
-import Alert from '../UI/Alert';
-import { AlertDescription } from '../UI/Alert';
-import Button from '../UI/Button';
-import useGameState from '../../hooks/useGameState';
-import { BOARD_PROPERTIES } from '../../constants/boardProperties';
+import React from "react";
+import BoardSquare from "../src/components/Board/BoardSquare";
+import PlayerCard from "../src/components/Cards/PlayerCard";
+import DiceIcon from "../src/components/Dice/Dice";
+import SelectPropertyModal from "../src/components/Modals/SelectPropertyModal";
+import Alert from "../src/components/UI/Alert";
+import { AlertDescription } from "../src/components/UI/Alert";
+import Button from "../src/components/UI/Button";
+import useGameState from "../src/hooks/useGameState";
+import { BOARD_PROPERTIES } from "../src/constants/boardProperties";
+import GameControls from "../src/components/Board/GameControls";
 
 const MonopolyBoard = () => {
   const {
@@ -19,7 +23,7 @@ const MonopolyBoard = () => {
     canEndTurn,
     actions,
     isModalOpen,
-    setIsModalOpen
+    setIsModalOpen,
   } = useGameState();
 
   if (isLoading) {
@@ -32,36 +36,36 @@ const MonopolyBoard = () => {
 
   if (error) {
     return (
-        <div>
+      <div>
         <Alert variant="destructive" className="m-4">
-            <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
         <Button onClick={actions.clearError} variant="default">
-            Dismiss
+          Dismiss
         </Button>
-        </div>
+      </div>
     );
   }
 
-    const hotels = (propertyId) => {
-      let hotelCount = 0;
-      gameState.players.forEach((player) => {
-        if (player.hotels && player.hotels[propertyId]) {
-          hotelCount = player.hotels[propertyId];
-        }
-      });
-      return hotelCount;
-    };
+  const hotels = (propertyId) => {
+    let hotelCount = 0;
+    gameState.players.forEach((player) => {
+      if (player.hotels && player.hotels[propertyId]) {
+        hotelCount = player.hotels[propertyId];
+      }
+    });
+    return hotelCount;
+  };
 
-    const houses = (propertyId) => {
-      let houseCount = 0;
-      gameState.players.forEach((player) => {
-        if (player.houses && player.houses[propertyId]) {
-          houseCount = player.houses[propertyId];
-        }
-      });
-      return houseCount;
-    };
+  const houses = (propertyId) => {
+    let houseCount = 0;
+    gameState.players.forEach((player) => {
+      if (player.houses && player.houses[propertyId]) {
+        houseCount = player.houses[propertyId];
+      }
+    });
+    return houseCount;
+  };
 
   const renderBoard = () => (
     <div className="grid grid-cols-11 gap-0 border border-gray-300">
@@ -122,11 +126,49 @@ const MonopolyBoard = () => {
     </div>
   );
 
+  const renderPlayerCards = () => (
+    <div className="space-y-4">
+      {gameState.players.map((player, index) => (
+        <PlayerCard
+          key={index}
+          player={player}
+          isCurrentPlayer={index === gameState.currentPlayer}
+        />
+      ))}
+    </div>
+  );
+
   return (
     <div className="container mx-auto p-1">
       <div className="flex gap-8">
         {/* Left side - Game board */}
         <div className="flex-1">{renderBoard()}</div>
+
+        {/* Right side - Controls and player info */}
+        <div className="w-80 space-y-6">
+          <GameControls
+            currentPlayer={currentPlayer}
+            lastRoll={lastRoll}
+            isRolling={isRolling}
+            canRollDice={canRollDice}
+            canBuyProperty={canBuyProperty}
+            canEndTurn={canEndTurn}
+            actions={actions}
+            onOpenMortgageModal={() => setIsModalOpen(true)}
+          />
+          {renderPlayerCards()}
+        </div>
+
+        {/* Modals */}
+        <SelectPropertyModal
+          isOpen={isModalOpen}
+          onRequestClose={() => setIsModalOpen(false)}
+          properties={currentPlayer?.properties || []}
+          onSelectProperty={(property) => {
+            actions.mortgageProperty(property);
+            setIsModalOpen(false);
+          }}
+        />
       </div>
     </div>
   );
