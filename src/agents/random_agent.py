@@ -19,7 +19,9 @@ class RandomAgent(Player):
         budget = game_state.player_balances[self]
         price = property.price
 
-        if budget >= price:
+        if budget >= price\
+            and not property in game_state.properties[self]\
+            and not property in game_state.mortgaged_properties:
             return random.choice([True, False])
         return False
     
