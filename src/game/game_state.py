@@ -84,6 +84,10 @@ class GameState:
 
 
     def move_player(self, player: Player, dice: tuple[int, int]):
+        if self.in_jail[player]:
+            print(f"{player} is in jail")
+            raise PlayerInJailException(player)
+
         self.doubles_rolled += 1 if dice[0] == dice[1] else 0
         if self.doubles_rolled == 3:
             self.sent_player_to_jail(player)
@@ -179,8 +183,8 @@ class GameState:
         if error := GameValidation.validate_place_house(self, player, property_group):
             raise error
         
-        cost = property_group.house_cost() * len(self.board.get_properties_by_group(property_group))
         print(f"{player} placed a house on {property_group}")
+        cost = property_group.house_cost() * len(self.board.get_properties_by_group(property_group))
         self.houses[property_group] = (self.houses[property_group][0] + 1, player)
         self.player_balances[player] -= cost
 
@@ -188,6 +192,7 @@ class GameState:
         if error := GameValidation.validate_place_hotel(self, player, property_group):
             raise error
         
+        print(f"{player} placed a hotel on {property_group}")
         cost = property_group.hotel_cost()
         self.hotels[property_group] = (1, player)
         self.houses[property_group] = (0, None)
@@ -212,6 +217,7 @@ class GameState:
         if error := GameValidation.validate_sell_house(self, player, property_group):
             raise error
         
+        print(f"{player} sold a house on {property_group}")
         group_properties = self.board.get_properties_by_group(property_group)
         cost = property_group.house_cost() * len(group_properties) // 2
         self.houses[property_group] = (self.houses[property_group][0] - 1, player)
@@ -221,6 +227,7 @@ class GameState:
         if error := GameValidation.validate_sell_hotel(self, player, property_group):
             raise error
         
+        print(f"{player} sold a hotel on {property_group}")
         cost = property_group.hotel_cost() // 2
         self.hotels[property_group] = (0, None)
         self.houses[property_group] = (4, player)
@@ -234,6 +241,7 @@ class GameState:
         if error := GameValidation.validate_get_out_of_jail(self, player):
             raise error
         
+        print(f"{player} got out of jail by rolling doubles")
         self.in_jail[player] = False
         self.player_positions[player] = 10
         self.turns_in_jail[player] = 0
@@ -242,6 +250,7 @@ class GameState:
         if error := GameValidation.validate_use_escape_jail_card(self, player):
             raise error
         
+        print(f"{player} used a Get Out of Jail card")
         self.escape_jail_cards[player] -= 1
         self.in_jail[player] = False
         self.player_positions[player] = 10
@@ -251,12 +260,14 @@ class GameState:
         if error := GameValidation.validate_pay_get_out_of_jail_fine(self, player):
             raise error
         
+        print(f"{player} paid ${self.board.get_jail_fine()} to get out of jail")
         self.player_balances[player] -= self.board.get_jail_fine()
         self.in_jail[player] = False
         self.player_positions[player] = 10
         self.turns_in_jail[player] = 0
 
     def count_turn_in_jail(self, player: Player):
+        print(f"{player} is in jail for {self.turns_in_jail[player]} turns")
         self.turns_in_jail[player] += 1
 
     def pay_tax(self, player: Player, tax: int):
@@ -303,12 +314,12 @@ class GameState:
         
         if isinstance(property, Property):
             rent = property.base_rent
-            if all(property in self.properties[owner] for property in self.board.get_properties_by_group(property.group)):
-                rent = property.full_group_rent
+            if self.houses[property.group][0] > 0:
+                rent = property.house_rent[self.houses[property.group][0] - 1]
             elif self.hotels[property.group][0] > 0:
                 rent = property.hotel_rent
-            elif self.houses[property.group][0] > 0:
-                rent = property.house_rent[self.houses[property.group][0] - 1]
+            elif all(property in self.properties[owner] for property in self.board.get_properties_by_group(property.group)):
+                rent = property.full_group_rent
                 
         elif isinstance(property, Railway):
             rent_index = -1

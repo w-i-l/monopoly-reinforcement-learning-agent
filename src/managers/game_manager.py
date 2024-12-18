@@ -47,6 +47,8 @@ class GameManager:
                         self.game_state.pay_get_out_of_jail_fine(current_player)
                     else:
                         self.game_state.count_turn_in_jail(current_player)
+                        self.__handle_in_jail_actions(current_player)
+                        return
 
 
         # Roll the dice
@@ -124,6 +126,17 @@ class GameManager:
         # TODO: Implement the logic for auctioning the property if the player does not buy it
 
 
+        # Check if the player wants to downgrade properties
+        self.__handle_downgrading_suggestions(current_player)
+
+        # Check if the player wants to mortgage properties
+        self.__handle_mortgaging_suggestions(current_player)
+
+        # Check if the player wants to upgrade properties
+        self.__handle_upgrading_suggestions(current_player)
+            
+
+    def __handle_downgrading_suggestions(self, current_player):
         suggestions = current_player.get_downgrading_suggestions(self.game_state)
         for suggestion in suggestions:
             try:
@@ -136,11 +149,10 @@ class GameManager:
                 ErrorLogger.log_error(e)
                 print("Player does not have enough balance to downgrade the property")
                 return -1
-
-
-        # Check if the player wants to mortgage properties
+            
+    def __handle_mortgaging_suggestions(self, current_player):
         suggestions = current_player.get_mortgaging_suggestions(self.game_state)
-        print("Mortgaging suggestions: ", suggestions)
+        # print("Mortgaging suggestions: ", suggestions)
         for suggestion in suggestions:
             try:
                 self.game_state.mortgage_property(current_player, suggestion)
@@ -152,11 +164,10 @@ class GameManager:
                 ErrorLogger.log_error(e)
                 print("Player does not have enough balance to mortgage the property")
                 return -1
-                
-
-        # Check if the player wants to upgrade properties
+            
+    def __handle_upgrading_suggestions(self, current_player):
         suggestions = current_player.get_upgrading_suggestions(self.game_state)
-        print("Upgrading suggestions: ", suggestions)
+        # print("Upgrading suggestions: ", suggestions)
         for suggestion in suggestions:
             try:
                 self.game_state.update_property_group(current_player, suggestion)
@@ -168,6 +179,12 @@ class GameManager:
                 ErrorLogger.log_error(e)
                 print("Player does not have enough balance to upgrade the property")
                 return -1
+            
+    
+    def __handle_in_jail_actions(self, current_player):
+        self.__handle_downgrading_suggestions(current_player)
+        self.__handle_mortgaging_suggestions(current_player)
+        self.__handle_upgrading_suggestions(current_player)
 
 
     def change_turn(self):
@@ -183,17 +200,25 @@ class GameManager:
 if __name__ == "__main__":
     from agents.random_agent import RandomAgent
     from agents.human_agent import HumanAgent
+    from agents.strategic_agent import StrategicAgent
     import time
     from models.property_group import PropertyGroup
 
     random_agent = RandomAgent("Random player")
+    random_agent2 = RandomAgent("Random player 2")
+    random_agent3 = RandomAgent("Random player 3")
+    random_agent4 = RandomAgent("Random player 4")
+
+    strategic_agent = StrategicAgent("Strategic player")
     human_player = HumanAgent("Human Player", port=6060)
-    players = [random_agent, human_player]
+    players = [strategic_agent, human_player]
     game_manager = GameManager(players)
-    brown = game_manager.game_state.board.get_properties_by_group(PropertyGroup.BROWN)
-    game_manager.game_state.properties[human_player] = brown
-    game_manager.game_state.is_owned.update(brown)
-    game_manager.game_state.place_house(human_player, PropertyGroup.BROWN)
+    # game_manager.game_state.in_jail[human_player] = True
+    # game_manager.game_state.player_positions[human_player] = 10
+    # brown = game_manager.game_state.board.get_properties_by_group(PropertyGroup.BROWN)
+    # game_manager.game_state.properties[human_player] = brown
+    # game_manager.game_state.is_owned.update(brown)
+    # game_manager.game_state.place_house(human_player, PropertyGroup.BROWN)
 
     human_player.game_state = game_manager.game_state
     can_continue = True

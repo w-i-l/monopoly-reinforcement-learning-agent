@@ -41,15 +41,20 @@ class RandomAgent(Player):
             group_len = len(game_state.board.get_properties_by_group(group))
             should_upgrade = random.choice([True, False])
 
+            for property in grouped_properties[group]:
+                if property in game_state.mortgaged_properties:
+                    should_upgrade = False
+                    break
+                
             if group_len == len(grouped_properties[group]):
                 # if we can build a house
-                if game_state.houses[group][0] < 4:
+                if game_state.houses[group][0] < 4 and game_state.hotels[group][0] == 0:
                     price = group.house_cost() * group_len
                     if budget >= price and should_upgrade:
                         suggestions.append(group)
                         budget -= price
                 # if we can build a hotel
-                elif game_state.hotels[group][0] < 1:
+                elif game_state.hotels[group][0] < 1 and game_state.houses[group][0] == 4:
                     price = group.hotel_cost() * group_len
                     if budget >= price and should_upgrade:
                         suggestions.append(group)

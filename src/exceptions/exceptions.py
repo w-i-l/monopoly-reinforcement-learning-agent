@@ -91,3 +91,23 @@ class MortgagePropertyRentException(GameException):
     def __init__(self, property_name: str):
         self.message = f"Cannot pay rent on mortgaged property {property_name}"
         super().__init__(self.message)
+
+class MortgagePropertyHouseException(GameException):
+    def __init__(self, property_name: str):
+        self.message = f"Cannot build house on mortgaged property {property_name}"
+        super().__init__(self.message)
+
+class MortgagePropertyHotelException(GameException):
+    def __init__(self, property_name: str):
+        self.message = f"Cannot build hotel on mortgaged property {property_name}"
+        super().__init__(self.message)
+
+class PlayerInJailException(GameException):
+    def __init__(self, player_name: str):
+        self.message = f"Player {player_name} is in jail"
+        super().__init__(self.message)
+
+class BuildingHousesOfTopOnHotelException(GameException):
+    def __init__(self, property_group: str):
+        self.message = f"Cannot build houses if there is an hotel already place on {property_group} group"
+        super.__init__(self.message)

@@ -65,9 +65,17 @@ class GameValidation:
 
     @staticmethod
     def validate_place_house(game_state: GameState, player: Player, property_group: PropertyGroup) -> Optional[GameException]:
+        if game_state.hotels[property_group][0] >= 1:
+            return BuildingHousesOfTopOnHotelException(str(property_group))
+        
         if game_state.houses[property_group][0] >= 4:
             return MaxHousesReachedException(str(property_group))
         
+        grouped_properties = game_state.board.get_properties_by_group(property_group)
+        for property in grouped_properties:
+            if property in game_state.mortgaged_properties:
+                return MortgagePropertyHouseException(str(property))
+
         group_properties = game_state.board.get_properties_by_group(property_group)
         if not all(property in game_state.properties[player] for property in group_properties):
             return IncompletePropertyGroupException(str(property_group))
@@ -82,6 +90,11 @@ class GameValidation:
     def validate_place_hotel(game_state: GameState, player: Player, property_group: PropertyGroup) -> Optional[GameException]:
         if game_state.hotels[property_group][0] >= 1:
             return MaxHotelsReachedException(str(property_group))
+        
+        grouped_properties = game_state.board.get_properties_by_group(property_group)
+        for property in grouped_properties:
+            if property in game_state.mortgaged_properties:
+                return MortgagePropertyHotelException(str(property))
         
         group_properties = game_state.board.get_properties_by_group(property_group)
         if not all(property in game_state.properties[player] for property in group_properties):
