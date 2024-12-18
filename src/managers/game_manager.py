@@ -26,33 +26,40 @@ class GameManager:
             print(f"{current_player} is bankrupt")
             print("GAME OVER")
             return -1
+        
+        dice_roll = None
 
         # TODO: Verify if the player can play - check if the player is in jail
         if self.game_state.in_jail[current_player]:
-            # try to pay the fine
-            if current_player.should_pay_get_out_of_jail_fine(self.game_state):
+            # try to roll a double
+            dice_roll = self.dice_manager.roll()
+            if dice_roll[0] == dice_roll[1]:
+                self.game_state.get_out_of_jail(current_player)
+
+            # if the player has been in jail for 3 turns, he must pay the fine
+            elif self.game_state.turns_in_jail[current_player] == 2:
                 self.game_state.pay_get_out_of_jail_fine(current_player)
 
             # try to use the escape jail card
             elif current_player.should_use_escape_jail_card(self.game_state):
                 self.game_state.use_escape_jail_card(current_player)
 
-            # try to roll a double
+            # TODO: implement the logic for buying the escape jail card from other players
+
+            # try to pay the fine
+            elif current_player.should_pay_get_out_of_jail_fine(self.game_state):
+                self.game_state.pay_get_out_of_jail_fine(current_player)
+
+            # count the turn in jail
             else:
-                dice_roll = self.dice_manager.roll()
-                if dice_roll[0] == dice_roll[1]:
-                    self.game_state.get_out_of_jail(current_player)
-                else:
-                    if self.game_state.turns_in_jail[current_player] == 2:
-                        self.game_state.pay_get_out_of_jail_fine(current_player)
-                    else:
-                        self.game_state.count_turn_in_jail(current_player)
-                        self.__handle_in_jail_actions(current_player)
-                        return
+                self.game_state.count_turn_in_jail(current_player)
+                self.__handle_in_jail_actions(current_player)
+                return
 
-
-        # Roll the dice
-        dice_roll = self.dice_manager.roll()
+        # Roll the dice if the player did not roll a double in attempt to get out of jail
+        if dice_roll is None:
+            dice_roll = self.dice_manager.roll()
+        print(f"{current_player} rolled {dice_roll[0]} and {dice_roll[1]}")
 
         # Move the player
         self.game_state.move_player(current_player, dice_roll)
@@ -192,53 +199,3 @@ class GameManager:
         print("\n\n")
         print(f"Next player: {self.players[self.game_state.current_player_index]}")
         print(self.game_state.player_balances)
-
-        
-            
-            
-
-if __name__ == "__main__":
-    from agents.random_agent import RandomAgent
-    from agents.human_agent import HumanAgent
-    from agents.strategic_agent import StrategicAgent
-    import time
-    from models.property_group import PropertyGroup
-
-    random_agent = RandomAgent("Random player")
-    random_agent2 = RandomAgent("Random player 2")
-    random_agent3 = RandomAgent("Random player 3")
-    random_agent4 = RandomAgent("Random player 4")
-
-    strategic_agent = StrategicAgent("Strategic player")
-    human_player = HumanAgent("Human Player", port=6060)
-    players = [strategic_agent, human_player]
-    game_manager = GameManager(players)
-    # game_manager.game_state.in_jail[human_player] = True
-    # game_manager.game_state.player_positions[human_player] = 10
-    # brown = game_manager.game_state.board.get_properties_by_group(PropertyGroup.BROWN)
-    # game_manager.game_state.properties[human_player] = brown
-    # game_manager.game_state.is_owned.update(brown)
-    # game_manager.game_state.place_house(human_player, PropertyGroup.BROWN)
-
-    human_player.game_state = game_manager.game_state
-    can_continue = True
-
-    for _ in range(1):
-        tourns = 0
-        while can_continue:
-            tourns += 1
-            try:
-                can_continue = game_manager.play_turn()
-            except NotEnoughBalanceException as e:
-                print(e)
-                print("GAME OVER")
-                break
-            can_continue = True if can_continue == None else False
-            game_manager.change_turn()
-            print(tourns)
-
-    print(game_manager.game_state.houses)
-    print(game_manager.game_state.hotels)
-    print(game_manager.game_state.player_balances)
-    print(game_manager.game_state.properties)
-        # time.sleep(0.1)

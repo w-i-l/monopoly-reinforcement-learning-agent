@@ -5,77 +5,53 @@ from utils.helper_functions import format_path
 from models.railway import Railway
 from models.utility import Utility
 from models.other_tiles import Taxes, Chance, CommunityChest, GoToJail, Jail, FreeParking, Go
+from managers.game_manager import GameManager
+from agents.random_agent import RandomAgent
+from agents.human_agent import HumanAgent
+from agents.strategic_agent import StrategicAgent
+import time
+from models.property_group import PropertyGroup
+from exceptions.exceptions import NotEnoughBalanceException
 
-tiles = []
 
-for group in PropertyGroup:
-    path = format_path(f'../data/properties/{group.value}.json')
-    with open(path, 'r') as f:
-        data = json.load(f)
-        properties = data['properties']
-        for property in properties:
-            id = property['id']
-            name = property['name']
-            group = PropertyGroup.init_from(group.value)
-            price = property['price']
-            base_rent = property['base_rent']
-            full_group_rent = property['full_group_rent']
-            house_rent = property['house_rent']
-            hotel_rent = property['hotel_rent']
-            mortgage = property['mortgage']
-            buyback_price = property['buyback_price']
-            tiles.append(Property(id, name, group, price, base_rent, full_group_rent, house_rent, hotel_rent, mortgage, buyback_price))
+if __name__ == "__main__":
 
-with open(format_path("../data/railway_stations.json"), 'r') as f:
-    data = json.load(f)
-    for railway in data['properties']:
-        id = railway['id']
-        name = railway['name']
-        tiles.append(Railway(id, name))
+    random_agent = RandomAgent("Random player")
+    random_agent2 = RandomAgent("Random player 2")
+    random_agent3 = RandomAgent("Random player 3")
+    random_agent4 = RandomAgent("Random player 4")
 
-with open(format_path("../data/utilities.json"), 'r') as f:
-    data = json.load(f)
-    for utility in data['properties']:
-        id = utility['id']
-        name = utility['name']
-        tiles.append(Utility(id, name))
+    strategic_agent = StrategicAgent("Strategic player")
+    human_player = HumanAgent("Human Player", port=6060)
+    players = [strategic_agent, human_player]
+    game_manager = GameManager(players)
+    
+    # game_manager.game_state.in_jail[human_player] = True
+    # game_manager.game_state.player_positions[human_player] = 10
+    # brown = game_manager.game_state.board.get_properties_by_group(PropertyGroup.BROWN)
+    # game_manager.game_state.properties[human_player] = brown
+    # game_manager.game_state.is_owned.update(brown)
+    # game_manager.game_state.place_house(human_player, PropertyGroup.BROWN)
 
-with open(format_path("../data/others.json"), 'r') as f:
-    data = json.load(f)
-    for other in data:
-        group = other['group']
+    human_player.game_state = game_manager.game_state
+    can_continue = True
 
-        if group == 'taxes':
-            for property in other['properties']:
-                id = property['id']
-                name = property['name']
-                tax = property['tax']
-                tiles.append(Taxes(id, name, tax))
-        elif group == 'chance':
-            for property in other['properties']:
-                id = property['id']
-                name = property['name']
-                tiles.append(Chance(id, name))
-        elif group == 'community_chest':
-            for property in other['properties']:
-                id = property['id']
-                name = property['name']
-                tiles.append(CommunityChest(id, name))
-        elif group == 'main_tiles':
-            for property in other['properties']:
-                id = property['id']
-                name = property['name']
+    for _ in range(1):
+        tourns = 0
+        while can_continue:
+            tourns += 1
+            try:
+                can_continue = game_manager.play_turn()
+            except NotEnoughBalanceException as e:
+                print(e)
+                print("GAME OVER")
+                break
+            can_continue = True if can_continue == None else False
+            game_manager.change_turn()
+            print(tourns)
 
-                if name == 'Start':
-                    tiles.append(Go(id, name))
-                elif name == 'Inchisoare | Vizita':
-                    tiles.append(Jail(id, name))
-                elif name == 'Parcare':
-                    tiles.append(FreeParking(id, name))
-                elif name == 'Du-te la Inchisoare':
-                    tiles.append(GoToJail(id, name))
-
-for index, tile in enumerate(tiles):
-    print(index, tile)
-
-            
+    print(game_manager.game_state.houses)
+    print(game_manager.game_state.hotels)
+    print(game_manager.game_state.player_balances)
+    print(game_manager.game_state.properties)
+        # time.sleep(0.1)

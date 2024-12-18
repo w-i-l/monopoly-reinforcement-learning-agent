@@ -60,6 +60,8 @@ class GameState:
 
     def sent_player_to_jail(self, player: Player):
         self.in_jail[player] = True
+        self.doubles_rolled = 0
+        self.turns_in_jail[player] = 0
         self.player_positions[player] = self.board.get_jail_id()
         print(f"{player} is sent to jail")
 
