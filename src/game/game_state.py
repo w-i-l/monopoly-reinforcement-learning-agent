@@ -137,35 +137,23 @@ class GameState:
     def buy_property(self, player: Player, property: Tile):
         if error := GameValidation.validate_buy_property(self, player, property):
             raise error
-        
-        if property in self.mortgaged_properties:
-            owner = None
-            for p in self.properties:
-                if property in self.properties[p]:
-                    owner = p
-                    break
-            
-            if owner == player:
-                self.mortgaged_properties.remove(property)
-                self.player_balances[player] -= property.buyback_price
-                print(f"{player} remove mortgage from {property}")
-
-            else:
-                self.player_balances[player] -= property.buyback_price
-                self.player_balances[player] -= property.price
-                self.player_balances[owner] += property.price
-                self.properties[owner].remove(property)
-                self.properties[player].append(property)
-                self.is_owned.add(property)
-                self.mortgaged_properties.remove(property)
-                print(f"{player} bought mortgaged {property} from {owner} for ${property.price}")
-        else:
-            self.properties[player].append(property)
-            self.is_owned.add(property)
-            self.player_balances[player] -= property.price
+    
+        self.properties[player].append(property)
+        self.is_owned.add(property)
+        self.player_balances[player] -= property.price
 
         print(f"{player} bought {property} remaining balance: ${self.player_balances[player]}")
         print(self.properties)
+
+
+    def unmortgage_property(self, player: Player, property: Tile):
+        if error := GameValidation.validate_unmortgage_property(self, player, property):
+            raise error
+        
+        print(f"{player} unmortaging {property}")
+        self.mortgaged_properties.remove(property)
+        self.player_balances[player] -= property.buyback_price
+
 
     def mortgage_property(self, player: Player, property: Tile):
         print(property)
@@ -296,17 +284,15 @@ class GameState:
             self, 
             player: Player, 
             property: Tile,
+            dice_roll: tuple[int, int] = None,
             utility_factor_multiplier: int = None,
             railway_factor_multiplier: int = None
         ):
-        # TODO: Add dice roll to validate rent for utilities
-        dice = 4
-
         if error := GameValidation.validate_pay_rent(
             self,
             player, 
             property, 
-            dice,
+            dice_roll,
             utility_factor_multiplier,
             railway_factor_multiplier
             ):
@@ -334,6 +320,7 @@ class GameState:
                 rent *= railway_factor_multiplier
 
         elif isinstance(property, Utility):
+            dice = sum(dice_roll)
             if utility_factor_multiplier:
                 rent = utility_factor_multiplier * dice
             else:

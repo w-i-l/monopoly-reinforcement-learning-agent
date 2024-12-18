@@ -17,25 +17,8 @@ else:
 class GameValidation:
     @staticmethod
     def validate_buy_property(game_state: GameState, player: Player, property: Tile) -> Optional[GameException]:
-        if property in game_state.is_owned and property not in game_state.mortgaged_properties:
+        if property in game_state.is_owned:
             return PropertyAlreadyOwnedException(str(property))
-        
-        owner = None
-        for p in game_state.properties:
-            if property in game_state.properties[p]:
-                owner = p
-                break
-
-        if owner == player and property not in game_state.mortgaged_properties:
-            return PropertyAlreadyOwnedException(str(property))
-        elif owner == player and property in game_state.mortgaged_properties:
-            if game_state.player_balances[player] < property.buyback_price:
-                return NotEnoughBalanceException(property.buyback_price, game_state.player_balances[player])
-            
-        if owner != player and property in game_state.mortgaged_properties:
-            price = property.buyback_price + property.price
-            if game_state.player_balances[player] < price:
-                return NotEnoughBalanceException(price, game_state.player_balances[player])
         
         if game_state.player_balances[player] < property.price:
             return NotEnoughBalanceException(property.price, game_state.player_balances[player])
@@ -44,6 +27,22 @@ class GameValidation:
             return PropertyAlreadyOwnedException(str(property))
 
         return None
+    
+    
+    @staticmethod
+    def validate_unmortgage_property(game_state: GameState, player: Player, property: Tile) -> Optional[GameException]:
+        if property not in game_state.is_owned:
+            return PropertyNotOwnedException(str(property))
+        
+        if property not in game_state.mortgaged_properties:
+            return PropertyNotMortgagedException(str(property))
+        
+        if property not in game_state.properties[player]:
+            return NotPropertyOwnerException(str(property), str(player))
+        
+        if game_state.player_balances[player] < property.buyback_price:
+            return NotEnoughBalanceException(property.buyback_price, game_state.player_balances[player])
+        
 
     @staticmethod
     def validate_mortgage_property(game_state: GameState, player: Player, property: Tile) -> Optional[GameException]:
@@ -169,7 +168,7 @@ class GameValidation:
         game_state: GameState,
         player: Player, 
         property: Tile, 
-        dice: int,
+        dice_roll: tuple[int, int] = None,
         utility_factor_multiplier: int = None,
         railway_factor_multiplier: int = None
         ) -> Optional[GameException]:
@@ -209,6 +208,9 @@ class GameValidation:
                 rent *= railway_factor_multiplier
 
         elif isinstance(property, Utility):
+            assert dice_roll is not None
+            dice = sum(dice_roll)
+            
             if utility_factor_multiplier:
                 rent = utility_factor_multiplier * dice
             else:
