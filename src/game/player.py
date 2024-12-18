@@ -24,6 +24,10 @@ class Player:
         # TODO: Implement the logic to suggest which properties to mortgage
         return []
     
+    def get_unmortgaging_suggestions(self, game_state) -> List[Tile]:
+        # TODO: Implement the logic to suggest which properties to unmortgage
+        return []
+    
     def get_downgrading_suggestions(self, game_state) -> List[Tile]:
         # TODO: Implement the logic to suggest which properties to downgrade
         return []
