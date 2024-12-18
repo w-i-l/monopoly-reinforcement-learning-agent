@@ -18,6 +18,9 @@ from game.player import Player
 from models.tile import Tile
 from models.property_group import PropertyGroup
 from models.property import Property
+from models.railway import Railway
+from models.utility import Utility
+from copy import deepcopy
 
 class HumanAgent(Player):
     def __init__(self, name, port=6060, frontend_port=5173):
@@ -109,6 +112,7 @@ class HumanAgent(Player):
         self.server_thread.join(timeout=1) # Wait for server to start
         print(f"Server started - http://127.0.0.1:{self.port}")
 
+
     def _get_project_root(self) -> Path:
         current_path = Path(__file__).resolve()  # Get the human_agent.py location
         # Go up until we find the src directory
@@ -118,6 +122,7 @@ class HumanAgent(Player):
             raise FileNotFoundError("Could not find src directory")
         return current_path.parent
     
+
     def _create_human_interface(self, components_dir: Path):
         human_player_dir = components_dir / "HumanPlayer"
         human_player_dir.mkdir(exist_ok=True)
@@ -203,6 +208,7 @@ class HumanAgent(Player):
                 f.write(main_content)
 
         return "HumanPlayerInterface"
+
 
     def _start_frontend(self):
         try:
@@ -307,10 +313,12 @@ class HumanAgent(Player):
                 self.frontend_process.wait()
             raise RuntimeError(f"Frontend failed to start: {str(e)}")
 
+
     def __del__(self):
         if hasattr(self, 'frontend_process'):
             self.frontend_process.kill()  # Force kill instead of terminate
             self.frontend_process.wait()
+
 
     def _wait_for_decision(self, decision_type: str, data: dict = None) -> any:
         self.decision_queue.put({
@@ -319,8 +327,12 @@ class HumanAgent(Player):
         })
         return self.response_queue.get()
 
+
     # Rest of the agent methods remain the same as in the previous version
     def should_buy_property(self, game_state: GameState, property: Tile) -> bool:
+        if not (isinstance(property, Property) or isinstance(property, Railway) or isinstance(property, Utility)):
+            return False
+
         try:
             data = {
                 "property": str(property),
@@ -333,6 +345,7 @@ class HumanAgent(Player):
             ErrorLogger.log_error(e)
             return False
 
+
     def get_upgrading_suggestions(self, game_state: GameState) -> List[PropertyGroup]:
         try:
             properties = game_state.properties[self]
@@ -344,6 +357,15 @@ class HumanAgent(Player):
             for property in properties:
                if isinstance(property, Property):   
                     grouped_properties[property.group].append(property)
+
+
+            grouped_properties_copy = deepcopy(grouped_properties)
+            for group in grouped_properties_copy:
+                if len(grouped_properties[group]) == len(game_state.board.get_properties_by_group(group)):
+                    grouped_properties.pop(group)
+
+            if not grouped_properties:
+                return []
 
             data = {
                 "grouped_properties": {
@@ -359,10 +381,14 @@ class HumanAgent(Player):
             ErrorLogger.log_error(e)
             return []
 
+
     def get_mortgaging_suggestions(self, game_state: GameState) -> List[Tile]:
         try:
             properties = [p for p in game_state.properties[self] 
                         if p not in game_state.mortgaged_properties]
+            
+            if not properties:
+                return []
             
             data = {
                 "properties": [str(p) for p in properties],
@@ -381,10 +407,14 @@ class HumanAgent(Player):
             ErrorLogger.log_error(e)
             return []
         
+
     def get_unmortgaging_suggestions(self, game_state: GameState) -> List[Tile]:
         try:
             properties = [p for p in game_state.properties[self] 
                         if p in game_state.mortgaged_properties]
+            
+            if not properties:
+                return []
             
             data = {
                 "properties": [str(p) for p in properties],
@@ -412,7 +442,11 @@ class HumanAgent(Player):
             ErrorLogger.log_error(e)
             return False
 
+
     def should_use_escape_jail_card(self, game_state: GameState) -> bool:
+        if game_state.escape_jail_cards[self] == 0:
+            return False
+        
         try:
             data = {
                 "has_card": game_state.escape_jail_cards[self] > 0
