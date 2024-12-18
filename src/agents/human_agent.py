@@ -380,6 +380,26 @@ class HumanAgent(Player):
         except Exception as e:
             ErrorLogger.log_error(e)
             return []
+        
+    def get_unmortgaging_suggestions(self, game_state: GameState) -> List[Tile]:
+        try:
+            properties = [p for p in game_state.properties[self] 
+                        if p in game_state.mortgaged_properties]
+            
+            data = {
+                "properties": [str(p) for p in properties],
+                "balance": game_state.player_balances[self]
+            }
+            
+            suggestions = self._wait_for_decision("unmortgage_properties", data)
+            return [
+                next(p for p in properties if str(p) == prop_str)
+                for prop_str in suggestions
+            ]
+        except Exception as e:
+            ErrorLogger.log_error(e)
+            return []
+
 
     def should_pay_get_out_of_jail_fine(self, game_state: GameState) -> bool:
         try:

@@ -139,6 +139,9 @@ class GameManager:
         # Check if the player wants to mortgage properties
         self.__handle_mortgaging_suggestions(current_player)
 
+        # Check if the player wants to unmortgage properties
+        self.__handle_unmortgaging_suggestions(current_player)
+
         # Check if the player wants to upgrade properties
         self.__handle_upgrading_suggestions(current_player)
             
@@ -154,8 +157,22 @@ class GameManager:
                 
                 # TODO: Handle player bankruptcy
                 ErrorLogger.log_error(e)
-                print("Player does not have enough balance to downgrade the property")
                 return -1
+            
+
+    def __handle_unmortgaging_suggestions(self, current_player):
+        suggestions = current_player.get_unmortgaging_suggestions(self.game_state)
+        for suggestion in suggestions:
+            try:
+                self.game_state.unmortgage_property(current_player, suggestion)
+            except Exception as e:
+                if isinstance(e, NotEnoughBalanceException):
+                    raise e
+                
+                # TODO: Handle error
+                ErrorLogger.log_error(e)
+                return -1
+    
             
     def __handle_mortgaging_suggestions(self, current_player):
         suggestions = current_player.get_mortgaging_suggestions(self.game_state)
@@ -191,6 +208,7 @@ class GameManager:
     def __handle_in_jail_actions(self, current_player):
         self.__handle_downgrading_suggestions(current_player)
         self.__handle_mortgaging_suggestions(current_player)
+        self.__handle_unmortgaging_suggestions(current_player)
         self.__handle_upgrading_suggestions(current_player)
 
 

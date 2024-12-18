@@ -5,11 +5,33 @@ from models.property_group import PropertyGroup
 from models.property import Property
 from models.utility import Utility
 from models.railway import Railway
-from typing import List, Dict, Set
+from typing import List, Dict
 
 class StrategicAgent(Player):
-    def __init__(self, name):
+    def __init__(self, name, 
+                 min_safe_balance: int = 200,
+                 emergency_threshold: int = 100,
+                 property_value_threshold: float = 1.1,
+                 hotel_roi_threshold: float = 0.15,
+                 house_roi_threshold: float = 0.12,
+                 max_mortgage_at_once: int = 2,
+                 railway_value_multiplier: float = 1.2,
+                 utility_pair_multiplier: float = 1.5,
+                 complete_set_multiplier: float = 1.5,
+                 jail_escape_property_threshold: int = 2):
         super().__init__(name)
+        # Configurable parameters
+        self.min_safe_balance = min_safe_balance
+        self.emergency_threshold = emergency_threshold
+        self.property_value_threshold = property_value_threshold
+        self.hotel_roi_threshold = hotel_roi_threshold
+        self.house_roi_threshold = house_roi_threshold
+        self.max_mortgage_at_once = max_mortgage_at_once
+        self.railway_value_multiplier = railway_value_multiplier
+        self.utility_pair_multiplier = utility_pair_multiplier
+        self.complete_set_multiplier = complete_set_multiplier
+        self.jail_escape_property_threshold = jail_escape_property_threshold
+        
         self.property_values = {}  # Cache for property valuations
         
     def calculate_property_value(self, game_state: GameState, property: Tile) -> float:
@@ -28,7 +50,7 @@ class StrategicAgent(Player):
             
             # High value for completing a set
             if owned_in_group == total_in_group - 1:
-                value_multiplier *= 1.5
+                value_multiplier *= self.complete_set_multiplier
             
             # Value properties with high rent return
             rent_to_cost = property.hotel_rent / property.price
@@ -47,11 +69,11 @@ class StrategicAgent(Player):
 
         elif isinstance(property, Railway):
             owned_railways = sum(1 for p in game_state.properties[self] if isinstance(p, Railway))
-            value_multiplier *= (1.2 ** owned_railways)  # Railways become more valuable together
+            value_multiplier *= (self.railway_value_multiplier ** owned_railways)
 
         elif isinstance(property, Utility):
             owned_utilities = sum(1 for p in game_state.properties[self] if isinstance(p, Utility))
-            value_multiplier *= (1.5 if owned_utilities == 1 else 1.0)  # Pair of utilities is valuable
+            value_multiplier *= (self.utility_pair_multiplier if owned_utilities == 1 else 1.0)
 
         self.property_values[property] = base_value * value_multiplier
         return self.property_values[property]
@@ -62,16 +84,15 @@ class StrategicAgent(Player):
 
         budget = game_state.player_balances[self]
         price = property.price
-        min_safe_balance = 200  # Keep emergency funds
 
-        if budget < price + min_safe_balance:
+        if budget < price + self.min_safe_balance:
             return False
 
         if property in game_state.properties[self] or property in game_state.mortgaged_properties:
             return False
 
         property_value = self.calculate_property_value(game_state, property)
-        return property_value > price * 1.1  # Buy if strategic value exceeds price by 10%
+        return property_value > price * self.property_value_threshold
 
     def get_upgrading_suggestions(self, game_state: GameState) -> List[PropertyGroup]:
         properties = [p for p in game_state.properties[self] if isinstance(p, Property)]
@@ -80,10 +101,13 @@ class StrategicAgent(Player):
             grouped_properties[prop.group].append(prop)
 
         budget = game_state.player_balances[self]
-        min_safe_balance = 300
         suggestions = []
 
         for group, props in grouped_properties.items():
+            # Skip if any property in the group is mortgaged
+            if any(p in game_state.mortgaged_properties for p in props):
+                continue
+                
             if len(props) != len(game_state.board.get_properties_by_group(group)):
                 continue
 
@@ -91,19 +115,17 @@ class StrategicAgent(Player):
             current_hotels = game_state.hotels[group][0]
             
             if current_hotels == 0 and current_houses == 4:
-                # Consider hotel upgrade
                 cost = group.hotel_cost()
-                if budget >= cost + min_safe_balance:
+                if budget >= cost + self.min_safe_balance:
                     roi = self._calculate_upgrade_roi(game_state, group, is_hotel=True)
-                    if roi > 0.15:  # 15% ROI threshold
+                    if roi > self.hotel_roi_threshold:
                         suggestions.append(group)
                         budget -= cost
             elif current_houses < 4 and current_hotels == 0:
-                # Consider house upgrade
                 cost = group.house_cost() * len(props)
-                if budget >= cost + min_safe_balance:
+                if budget >= cost + self.min_safe_balance:
                     roi = self._calculate_upgrade_roi(game_state, group, is_hotel=False)
-                    if roi > 0.12:  # 12% ROI threshold
+                    if roi > self.house_roi_threshold:
                         suggestions.append(group)
                         budget -= cost
 
@@ -129,7 +151,7 @@ class StrategicAgent(Player):
         properties = game_state.properties[self]
         budget = game_state.player_balances[self]
         
-        if budget > 200:  # Don't mortgage if we have sufficient funds
+        if budget > self.emergency_threshold:
             return []
             
         mortgage_candidates = []
@@ -143,14 +165,44 @@ class StrategicAgent(Player):
                 mortgage_value = prop.mortgage
                 mortgage_candidates.append((prop, strategic_value / mortgage_value))
                 
-        # Mortgage properties with lowest strategic value relative to mortgage value
         mortgage_candidates.sort(key=lambda x: x[1])
-        return [prop for prop, _ in mortgage_candidates[:2]]  # Mortgage up to 2 properties at a time
+        return [prop for prop, _ in mortgage_candidates[:self.max_mortgage_at_once]]
 
+    def get_unmortgaging_suggestions(self, game_state: GameState) -> List[Tile]:
+        properties = game_state.properties[self]
+        budget = game_state.player_balances[self]
+        mortgaged_properties = [p for p in properties if p in game_state.mortgaged_properties]
+        
+        if not mortgaged_properties or budget < self.min_safe_balance:
+            return []
+        
+        unmortgage_candidates = []
+        for prop in mortgaged_properties:
+            strategic_value = self.calculate_property_value(game_state, prop)
+            
+            # Calculate priority score based on various factors
+            priority_score = strategic_value / prop.buyback_price
+            
+            if isinstance(prop, Property):
+                # Higher priority for properties that complete sets
+                group_properties = game_state.board.get_properties_by_group(prop.group)
+                owned_unmortgaged = sum(1 for p in group_properties 
+                                      if p in game_state.properties[self] and 
+                                      p not in game_state.mortgaged_properties)
+                total_in_group = len(group_properties)
+                
+                if owned_unmortgaged == total_in_group - 1:
+                    priority_score *= 1.5
+                    
+            if budget >= prop.buyback_price + self.min_safe_balance:
+                unmortgage_candidates.append((prop, priority_score))
+        
+        unmortgage_candidates.sort(key=lambda x: x[1], reverse=True)  # Sort by highest priority
+        return [prop for prop, _ in unmortgage_candidates[:self.max_mortgage_at_once]]
 
     def get_downgrading_suggestions(self, game_state: GameState) -> List[Tile]:
-        if game_state.player_balances[self] > 300:
-            return []  # Don't downgrade if we have sufficient funds
+        if game_state.player_balances[self] > self.emergency_threshold:
+            return []
             
         properties = [p for p in game_state.properties[self] if isinstance(p, Property)]
         grouped_properties = {p.group: [] for p in properties}
@@ -164,11 +216,11 @@ class StrategicAgent(Player):
                 
             if game_state.hotels[group][0] > 0:
                 roi = self._calculate_upgrade_roi(game_state, group, is_hotel=True)
-                if roi < 0.1:  # Low ROI
+                if roi < self.hotel_roi_threshold * 0.7:  # Lower threshold for selling
                     suggestions.append(group)
             elif game_state.houses[group][0] > 0:
                 roi = self._calculate_upgrade_roi(game_state, group, is_hotel=False)
-                if roi < 0.08:  # Even lower ROI threshold for houses
+                if roi < self.house_roi_threshold * 0.7:
                     suggestions.append(group)
                     
         return suggestions
@@ -177,20 +229,18 @@ class StrategicAgent(Player):
         budget = game_state.player_balances[self]
         fine = game_state.board.get_jail_fine()
         
-        if budget < fine * 2:  # Don't pay if we're low on funds
+        if budget < fine * 2:
             return False
             
-        # Pay to get out if we have property opportunities or good properties
         valuable_properties = sum(1 for p in game_state.properties[self] 
                                 if isinstance(p, Property) and 
-                                self.calculate_property_value(game_state, p) > p.price * 1.3)
-        return valuable_properties > 2
+                                self.calculate_property_value(game_state, p) > p.price * self.property_value_threshold)
+        return valuable_properties > self.jail_escape_property_threshold
 
     def should_use_escape_jail_card(self, game_state: GameState) -> bool:
         if game_state.escape_jail_cards[self] == 0:
             return False
             
-        # Always use card if we have valuable properties generating rent
         valuable_properties = sum(1 for p in game_state.properties[self] 
                                 if isinstance(p, Property) and
                                 (game_state.houses[p.group][0] > 0 or

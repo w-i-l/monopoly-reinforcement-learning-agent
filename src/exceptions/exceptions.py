@@ -111,3 +111,8 @@ class BuildingHousesOfTopOnHotelException(GameException):
     def __init__(self, property_group: str):
         self.message = f"Cannot build houses if there is an hotel already place on {property_group} group"
         super.__init__(self.message)
+
+class PropertyNotMortgagedException(GameException):
+    def __init__(self, property_name: str):
+        self.message = f"Property {property_name} is not mortgaged"
+        super().__init__(self.message)

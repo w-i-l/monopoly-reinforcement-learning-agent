@@ -68,13 +68,25 @@ class RandomAgent(Player):
         properties = game_state.properties[self]
         properties = [property for property in properties if isinstance(property, Property)]
         properties = [property for property in properties if not property in game_state.mortgaged_properties]
-        budget = game_state.player_balances[self]
         suggestions = []
 
         for property in properties:
             should_mortgage = random.choice([True, False])
             can_be_mortgaged = not game_state.houses[property.group][0] > 0 and not game_state.hotels[property.group][0] > 0
             if should_mortgage and can_be_mortgaged:
+                suggestions.append(property)
+        return suggestions
+    
+    
+    def get_unmortgaging_suggestions(self, game_state: GameState) -> List[Tile]:
+        properties = game_state.properties[self]
+        properties = [property for property in properties if isinstance(property, Property)]
+        properties = [property for property in properties if property in game_state.mortgaged_properties]
+        suggestions = []
+
+        for property in properties:
+            should_unmortgage = random.choice([True, False])
+            if should_unmortgage:
                 suggestions.append(property)
         return suggestions
     
