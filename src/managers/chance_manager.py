@@ -14,22 +14,26 @@ class ChanceManager:
         shuffle(self.__shuffled_cards)
 
 
-    def draw_card(self, game_state: GameState, player) -> ChanceCard:
+    def draw_card(self, game_state: GameState, player, dice_roll: tuple[int, int] = None) -> ChanceCard:
         if len(self.__shuffled_cards) == 0:
             self.__shuffle_cards()
 
         card_id = self.__shuffled_cards.pop(0)
         card = self.chance_cards[card_id]
 
+        args = card[3]
+        if dice_roll is not None and card_id == 9: # Move player to nearest utility
+            args = (*args, dice_roll)
+
         return ChanceCard(
             id=card[0],
             description=card[1],
             action=card[2],
-            args=(game_state, player, *card[3])
+            args=(game_state, player, *args)
         )
 
 
-    def __move_player_to_nearest_utility(self, game_state: GameState, player):
+    def __move_player_to_nearest_utility(self, game_state: GameState, player, dice_roll: tuple[int, int]):
         utilities = game_state.board.get_utilities()
         player_position = game_state.player_positions[player]
 
@@ -48,7 +52,12 @@ class ChanceManager:
         if utility in game_state.is_owned and \
             not utility in game_state.properties[player] and\
             not utility in game_state.mortgaged_properties:
-            game_state.pay_rent(player, utility, utility_factor_multiplier=10)
+            game_state.pay_rent(
+                player,
+                utility,
+                dice_roll=dice_roll,
+                utility_factor_multiplier=10
+                )
         else:
             if player.should_buy_property(game_state, utility):
                 game_state.buy_property(player, utility)

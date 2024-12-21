@@ -106,7 +106,8 @@ class GameManager:
            tile not in self.game_state.properties[current_player] and\
            tile not in self.game_state.mortgaged_properties:
             try:
-                self.game_state.pay_rent(current_player, tile)
+                dice_roll = self.dice_manager.roll()
+                self.game_state.pay_rent(current_player, tile, dice_roll)
             except Exception as e:
                 if isinstance(e, NotEnoughBalanceException):
                     raise e
