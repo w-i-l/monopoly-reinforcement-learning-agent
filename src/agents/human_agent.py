@@ -361,7 +361,7 @@ class HumanAgent(Player):
 
             grouped_properties_copy = deepcopy(grouped_properties)
             for group in grouped_properties_copy:
-                if len(grouped_properties[group]) == len(game_state.board.get_properties_by_group(group)):
+                if len(grouped_properties[group]) != len(game_state.board.get_properties_by_group(group)):
                     grouped_properties.pop(group)
 
             if not grouped_properties:
@@ -386,6 +386,11 @@ class HumanAgent(Player):
         try:
             properties = [p for p in game_state.properties[self] 
                         if p not in game_state.mortgaged_properties]
+            
+            properties = [p for p in properties 
+                          if (isinstance(p, Property) and game_state.hotels[p.group][0] == 0 and game_state.houses[p.group][0] == 0)
+                          or not isinstance(p, Property)]
+
             
             if not properties:
                 return []
