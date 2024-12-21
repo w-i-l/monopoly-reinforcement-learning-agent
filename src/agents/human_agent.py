@@ -21,6 +21,8 @@ from models.property import Property
 from models.railway import Railway
 from models.utility import Utility
 from copy import deepcopy
+from models.trade_offer import TradeOffer
+from typing import Optional
 
 class HumanAgent(Player):
     def __init__(self, name, port=6060, frontend_port=5173):
@@ -332,6 +334,9 @@ class HumanAgent(Player):
     def should_buy_property(self, game_state: GameState, property: Tile) -> bool:
         if not (isinstance(property, Property) or isinstance(property, Railway) or isinstance(property, Utility)):
             return False
+        
+        if property in game_state.is_owned:
+            return False
 
         try:
             data = {
@@ -460,3 +465,105 @@ class HumanAgent(Player):
         except Exception as e:
             ErrorLogger.log_error(e)
             return False
+        
+
+    def should_accept_trade_offer(self, game_state: GameState, trade_offer: TradeOffer) -> bool:
+        try:
+            data = {
+                "source_player": str(trade_offer.source_player),
+                "properties_offered": [str(p) for p in trade_offer.properties_offered] if trade_offer.properties_offered else [],
+                "money_offered": trade_offer.money_offered,
+                "jail_cards_offered": trade_offer.jail_cards_offered,
+                "properties_requested": [str(p) for p in trade_offer.properties_requested] if trade_offer.properties_requested else [],
+                "money_requested": trade_offer.money_requested,
+                "jail_cards_requested": trade_offer.jail_cards_requested,
+                "my_balance": game_state.player_balances[self],
+                "their_balance": game_state.player_balances[trade_offer.source_player]
+            }
+            return self._wait_for_decision("accept_trade", data)
+        except Exception as e:
+            print(f"Error in should_accept_trade_offer: {e}")
+            return False
+
+    def get_trade_offers(self, game_state: GameState) -> Optional[List[TradeOffer]]:
+        try:
+            players_data = []
+            for player in game_state.players:
+                if player != self:
+                    players_data.append({
+                        "name": str(player),
+                        "properties": [str(p) for p in game_state.properties[player]],
+                        "balance": game_state.player_balances[player],
+                        "jail_cards": game_state.escape_jail_cards[player]
+                    })
+
+            my_data = {
+                "properties": [str(p) for p in game_state.properties[self]],
+                "balance": game_state.player_balances[self],
+                "jail_cards": game_state.escape_jail_cards[self]
+            }
+
+            data = {
+                "my_data": my_data,
+                "players": players_data
+            }
+
+            trade_data = self._wait_for_decision("create_trade", data)
+
+            if not trade_data:
+                return None
+                
+            # Convert the trade data into TradeOffer objects
+            offers = []
+            for trade in trade_data:
+                target_player = next(p for p in game_state.players if str(p) == trade["target_player"])
+
+
+                # Convert property strings back to Property objects
+                properties_offered = []
+                if "properties_offered" in trade and trade["properties_offered"]:
+                    for prop_str in trade["properties_offered"]:
+                        prop = game_state.board.get_tile_by_name(prop_str)
+                        if prop:
+                            properties_offered.append(prop)
+
+                properties_requested = []
+                if "properties_requested" in trade and trade["properties_requested"]:
+                    for prop_str in trade["properties_requested"]:
+                        prop = game_state.board.get_tile_by_name(prop_str)
+                        if prop:
+                            properties_requested.append(prop)
+
+                money_offered = None
+                if "money_offered" in trade:
+                    money_offered = trade["money_offered"]
+
+                money_requested = None
+                if "money_requested" in trade:
+                    money_requested = trade["money_requested"]
+
+                jail_cards_offered = None
+                if "jail_cards_offered" in trade:
+                    jail_cards_offered = trade["jail_cards_offered"]
+
+                jail_cards_requested = None
+                if "jail_cards_requested" in trade:
+                    jail_cards_requested = trade["jail_cards_requested"]
+
+                offer = TradeOffer(
+                    source_player=self,
+                    target_player=target_player,
+                    properties_offered=properties_offered,
+                    money_offered=money_offered,
+                    jail_cards_offered=jail_cards_offered,
+                    properties_requested=properties_requested,
+                    money_requested=money_requested,
+                    jail_cards_requested=jail_cards_requested
+                )
+                offers.append(offer)
+            
+            return offers
+            
+        except Exception as e:
+            ErrorLogger.log_error(e)
+            return None

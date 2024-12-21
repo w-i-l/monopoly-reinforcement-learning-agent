@@ -7,6 +7,7 @@ from typing import List
 from models.property import Property
 from models.utility import Utility
 from models.railway import Railway
+from models.trade_offer import TradeOffer
 
 class RandomAgent(Player):
     def __init__(self, name):
@@ -135,6 +136,49 @@ class RandomAgent(Player):
         should_use = random.choice([True, False])
         return cards > 0 and should_use
     
+
+    def should_accept_trade_offer(self, game_state, trade_offer):
+        return random.choice([True, False])
+    
+
+    def get_trade_offers(self, game_state) -> List[TradeOffer]:
+        trade_offers = []
+
+        for player in game_state.players:
+            if player != self and random.choice([True, False]):
+                properties_offered = []
+                properties_requested = []
+                money_offered = random.randint(0, game_state.player_balances[self])
+                money_requested = random.randint(0, game_state.player_balances[player])
+                jail_cards_offered = random.randint(0, game_state.escape_jail_cards[self])
+                jail_cards_requested = random.randint(0, game_state.escape_jail_cards[player])
+
+                for property in game_state.properties[self]:
+                    if random.choice([True, False]):
+                        properties_offered.append(property)
+
+                for property in game_state.properties[player]:
+                    if random.choice([True, False]):
+                        properties_requested.append(property)
+
+                if properties_offered == [] and properties_requested == [] and\
+                    jail_cards_offered == 0 and jail_cards_requested == 0:
+                    continue
+
+                trade_offer = TradeOffer(
+                    self,
+                    player,
+                    properties_offered,
+                    money_offered,
+                    jail_cards_offered,
+                    properties_requested,
+                    money_requested,
+                    jail_cards_requested
+                )
+                trade_offers.append(trade_offer)
+
+        return trade_offers
+
 
 
 

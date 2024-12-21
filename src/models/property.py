@@ -27,4 +27,4 @@ class Property(Tile):
         self.buyback_price = buyback_price
 
     def __repr__(self):
-        return f"{self.name} ({self.group.value})"
+        return f"{self.name}"

@@ -5,6 +5,7 @@ import Button from "../UI/Button";
 import useGameState from "../../hooks/useGameState";
 import PlayerCard from "../Cards/PlayerCard";
 import MonopolyBoard from "../Board/MonopolyBoard";
+import { TradeOfferModal, CreateTradeModal } from "../Modals/TradeOfferModal";
 
 const HumanPlayerInterface = ({ playerPort = 6060 }) => {
   const [pendingDecision, setPendingDecision] = useState(null);
@@ -19,6 +20,14 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
     isLoading,
   } = useGameState();
 
+  // Clear pending decisions when component unmounts
+  useEffect(() => {
+    return () => {
+      localStorage.removeItem("pendingDecision");
+    };
+  }, []);
+
+  // Poll for pending decisions
   useEffect(() => {
     const savedDecision = localStorage.getItem("pendingDecision");
     if (savedDecision) {
@@ -46,6 +55,7 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
     return () => clearInterval(interval);
   }, [playerPort]);
 
+  // Handle decision submission
   const handleDecision = async (choice) => {
     try {
       const response = await fetch(
@@ -65,6 +75,7 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
     }
   };
 
+  // Toggle selection in multi-select scenarios
   const toggleSelection = (item) => {
     const newSelection = new Set(selectedItems);
     if (newSelection.has(item)) {
@@ -75,6 +86,7 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
     setSelectedItems(newSelection);
   };
 
+  // UI Components
   const SelectableButton = ({
     item,
     children,
@@ -101,26 +113,27 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
   const DecisionCard = ({ title, children, actions }) => (
     <div className="bg-white p-4 rounded-lg shadow-md mb-4">
       <h3 className="text-lg font-bold mb-3">{title}</h3>
-      <Button onClick={() => handleDecision([])} className="w-full">
-        Skip
-      </Button>
+      {(
+        <Button onClick={() => handleDecision([])} className="w-full mb-2">
+          Skip
+        </Button>
+      )}
       {children}
       {actions && <div className="mt-4 space-y-2">{actions}</div>}
     </div>
   );
 
   const renderMultipleActionButtons = (type) => (
-    <>
-      <Button
-        onClick={() => handleDecision(Array.from(selectedItems))}
-        disabled={selectedItems.size === 0}
-        className="w-full mb-2"
-      >
-        {`Confirm Selected ${type} (${selectedItems.size})`}
-      </Button>
-    </>
+    <Button
+      onClick={() => handleDecision(Array.from(selectedItems))}
+      disabled={selectedItems.size === 0}
+      className="w-full"
+    >
+      {`Confirm Selected ${type} (${selectedItems.size})`}
+    </Button>
   );
 
+  // Decision UI renderer
   const renderDecisionUI = () => {
     if (!pendingDecision) return null;
 
@@ -184,32 +197,6 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
         </DecisionCard>
       ),
 
-      unmortgage_properties: () => (
-        <DecisionCard
-          title="Unmortgage Properties"
-          actions={renderMultipleActionButtons("Unmortgages")}
-        >
-          {renderMoneyInfo({ balance: pendingDecision.data.balance })}
-          <div className="space-y-2">
-            {pendingDecision.data.properties.map((prop) => {
-              const isSelected = selectedItems.has(prop);
-              return (
-                <SelectableButton
-                  key={prop}
-                  item={prop}
-                  onClick={() => toggleSelection(prop)}
-                  selected={isSelected}
-                  className="w-full"
-                >
-                  Unmortgage {prop}
-                </SelectableButton>
-              );
-            })}
-          </div>
-        </DecisionCard>
-      ),
-
-      // ... rest of the decision cases remain the same
       buy_property: () => (
         <DecisionCard title="Buy Property?">
           <div className="text-lg mb-2">{pendingDecision.data.property}</div>
@@ -226,6 +213,25 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
             </Button>
           </div>
         </DecisionCard>
+      ),
+
+      accept_trade: () => (
+        <TradeOfferModal
+          isOpen={true}
+          onClose={() => handleDecision(false)}
+          tradeOffer={pendingDecision.data}
+          onAccept={() => handleDecision(true)}
+          onReject={() => handleDecision(false)}
+        />
+      ),
+
+      create_trade: () => (
+        <CreateTradeModal
+          isOpen={true}
+          onClose={() => handleDecision(null)}
+          tradeData={pendingDecision.data}
+          onSubmit={handleDecision}
+        />
       ),
 
       pay_jail_fine: () => (
@@ -266,7 +272,7 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
     return decisions[pendingDecision.type]?.() || null;
   };
 
-  // Rest of the component remains the same...
+  // Player cards renderer
   const renderPlayerCards = () => (
     <div className="space-y-4">
       {gameState?.players.map((player, index) => (
@@ -279,6 +285,7 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
     </div>
   );
 
+  // Main render
   return (
     <div className="container mx-auto p-4">
       {(error || gameError) && (
@@ -300,6 +307,15 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
 
         <div className="w-1/3 space-y-4">
           {renderDecisionUI()}
+          <div className="mb-4">
+            <Button
+              onClick={() => handleDecision({ type: "create_trade" })}
+              className="w-full"
+              disabled={!currentPlayer || pendingDecision}
+            >
+              Propose Trade
+            </Button>
+          </div>
           {renderPlayerCards()}
         </div>
       </div>

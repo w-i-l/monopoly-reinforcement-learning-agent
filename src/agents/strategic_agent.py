@@ -6,6 +6,7 @@ from models.property import Property
 from models.utility import Utility
 from models.railway import Railway
 from typing import List, Dict
+from models.trade_offer import TradeOffer
 
 class StrategicAgent(Player):
     def __init__(self, name, 
@@ -246,3 +247,164 @@ class StrategicAgent(Player):
                                 (game_state.houses[p.group][0] > 0 or
                                  game_state.hotels[p.group][0] > 0))
         return valuable_properties > 0
+    
+    def should_accept_trade_offer(self, game_state, trade_offer: TradeOffer) -> bool:
+        """Evaluate whether to accept an incoming trade offer based on strategic value."""
+        # Validate trade offer and its components
+        if not trade_offer:
+            return False
+            
+        # Initialize with empty lists/values if None
+        properties_offered = trade_offer.properties_offered or []
+        money_offered = trade_offer.money_offered or 0
+        jail_cards_offered = trade_offer.jail_cards_offered or 0
+        properties_requested = trade_offer.properties_requested or []
+        money_requested = trade_offer.money_requested or 0
+        jail_cards_requested = trade_offer.jail_cards_requested or 0
+
+        # Validate we have enough resources for the trade
+        if (game_state.player_balances[self] < money_requested or
+            game_state.escape_jail_cards[self] < jail_cards_requested):
+            return False
+
+        # Verify we actually own the requested properties
+        if not all(prop in game_state.properties[self] for prop in properties_requested):
+            return False
+
+        # Verify they own the offered properties
+        if not all(prop in game_state.properties[trade_offer.source_player] 
+                for prop in properties_offered):
+            return False
+
+        # Calculate total value of what we're giving up
+        value_giving = (
+            money_requested +
+            (jail_cards_requested * 50) +  # Base value for jail cards
+            sum(self.calculate_property_value(game_state, prop)
+                for prop in properties_requested if prop is not None)
+        )
+
+        # Calculate total value of what we're receiving
+        value_receiving = (
+            money_offered +
+            (jail_cards_offered * 50) +
+            sum(self.calculate_property_value(game_state, prop)
+                for prop in properties_offered if prop is not None)
+        )
+
+        # Additional value adjustments based on strategic factors
+        for prop in properties_offered:
+            if prop is not None and isinstance(prop, Property):
+                # Check if this completes a color set for us
+                group_properties = game_state.board.get_properties_by_group(prop.group)
+                if group_properties:  # Verify group properties exist
+                    owned_in_group = sum(1 for p in group_properties 
+                                    if p in game_state.properties[self])
+                    if owned_in_group == len(group_properties) - 1:
+                        value_receiving *= self.complete_set_multiplier
+
+        for prop in properties_requested:
+            if prop is not None and isinstance(prop, Property):
+                # Reduce likelihood of breaking existing color sets
+                group_properties = game_state.board.get_properties_by_group(prop.group)
+                if group_properties:  # Verify group properties exist
+                    owned_in_group = sum(1 for p in group_properties 
+                                    if p in game_state.properties[self])
+                    if owned_in_group == len(group_properties):
+                        value_giving *= self.complete_set_multiplier
+
+        # Consider current financial situation
+        if game_state.player_balances[self] - money_requested < self.emergency_threshold:
+            value_giving *= 1.5  # Increase perceived cost if it puts us in financial danger
+
+        # Strategic adjustment based on other player's position
+        if trade_offer.source_player in game_state.properties:
+            opponent_properties = len(game_state.properties[trade_offer.source_player])
+            our_properties = len(game_state.properties[self])
+            if opponent_properties > our_properties * 1.5:  # If they're significantly ahead
+                value_receiving *= 1.2  # We're more willing to take risks
+
+        # Final decision with a small margin for positive trades
+        return value_receiving > value_giving * 1.1  # 10% margin required for acceptance
+
+    def get_trade_offers(self, game_state) -> List[TradeOffer]:
+        """Generate strategic trade offers for other players."""
+        trade_offers = []
+        
+        # Validate game state and players
+        if not game_state or not game_state.players:
+            return []
+            
+        other_players = [p for p in game_state.players if p != self]
+        if not other_players:
+            return []
+        
+        for target_player in other_players:
+            # Validate target player exists in game state
+            if target_player not in game_state.properties or \
+            target_player not in game_state.player_balances:
+                continue
+
+            # Skip if target player is in poor financial condition
+            if game_state.player_balances[target_player] < self.emergency_threshold:
+                continue
+
+            # Analyze which properties we want from them
+            desired_properties = []
+            for prop in game_state.properties[target_player]:
+                if prop is not None and isinstance(prop, Property):
+                    group_properties = game_state.board.get_properties_by_group(prop.group)
+                    if not group_properties:  # Skip if group properties don't exist
+                        continue
+                        
+                    our_count = sum(1 for p in group_properties 
+                                if p in game_state.properties[self])
+                    if our_count > 0:  # We already have some properties in this group
+                        desired_properties.append(prop)
+
+            if not desired_properties:
+                continue
+
+            # Calculate what we're willing to offer
+            properties_to_offer = []
+            money_to_offer = 0
+            
+            # Look for properties we're willing to trade
+            for prop in game_state.properties[self]:
+                if prop is not None and isinstance(prop, Property):
+                    # Don't offer properties that would break our monopolies
+                    group_properties = game_state.board.get_properties_by_group(prop.group)
+                    if not group_properties:  # Skip if group properties don't exist
+                        continue
+                        
+                    our_count = sum(1 for p in group_properties 
+                                if p in game_state.properties[self])
+                    if our_count != len(group_properties):
+                        strategic_value = self.calculate_property_value(game_state, prop)
+                        if strategic_value < prop.price * self.property_value_threshold:
+                            properties_to_offer.append(prop)
+
+            # Calculate fair money offer based on property values
+            desired_value = sum(self.calculate_property_value(game_state, p) 
+                            for p in desired_properties if p is not None)
+            offered_value = sum(self.calculate_property_value(game_state, p) 
+                            for p in properties_to_offer if p is not None)
+            
+            value_difference = desired_value - offered_value
+            
+            # Only proceed if we can afford a fair trade
+            if value_difference > 0:
+                # Ensure we maintain minimum safe balance
+                max_money_offer = game_state.player_balances[self] - self.min_safe_balance
+                money_to_offer = min(value_difference, max_money_offer)
+                
+                if money_to_offer > 0 or properties_to_offer:
+                    trade_offers.append(TradeOffer(
+                        source_player=self,
+                        target_player=target_player,
+                        properties_offered=properties_to_offer,
+                        money_offered=money_to_offer,
+                        properties_requested=desired_properties
+                    ))
+
+        return trade_offers
