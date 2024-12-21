@@ -39,3 +39,11 @@ class Player:
     def should_use_escape_jail_card(self, game_state) -> bool:
         # TODO: Implement the logic to decide if the player should use the get out of jail free card
         return True
+    
+    def should_accept_trade_offer(self, game_state, trade_offer) -> bool:
+        # TODO: Implement the logic to decide if the player should accept the trade offer
+        return True
+    
+    def get_trade_offers(self, game_state) -> List:
+        # TODO: Implement the logic to suggest trade offers
+        return []
