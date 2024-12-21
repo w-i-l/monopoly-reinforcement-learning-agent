@@ -116,3 +116,53 @@ class PropertyNotMortgagedException(GameException):
     def __init__(self, property_name: str):
         self.message = f"Property {property_name} is not mortgaged"
         super().__init__(self.message)
+
+class PlayerDoesNotExistException(GameException):
+    def __init__(self, player_name: str):
+        self.message = f"Player {player_name} does not exist"
+        super().__init__(self.message)
+
+class PropertyInBothOfferedException(GameException):
+    def __init__(self, property_name: str):
+        self.message = f"Property {property_name} is in both offered and requested properties"
+        super().__init__(self.message)
+
+class MortgagePropertyTradeException(GameException):
+    def __init__(self, property_name: str):
+        self.message = f"Cannot trade mortgaged property {property_name}"
+        super().__init__(self.message)
+
+class NegativeMoneyOfferedException(GameException):
+    def __init__(self):
+        self.message = "Money offered cannot be negative"
+        super().__init__(self.message)
+
+class NegativeJailCardOfferedException(GameException):
+    def __init__(self):
+        self.message = "Jail cards offered cannot be negative"
+        super().__init__(self.message)
+
+class NegativeMoneyRequestedException(GameException):
+    def __init__(self):
+        self.message = "Money requested cannot be negative"
+        super().__init__(self.message)
+
+class NegativeJailCardRequestedException(GameException):
+    def __init__(self):
+        self.message = "Jail cards requested cannot be negative"
+        super().__init__(self.message)
+
+class NotEnoughJailCardsException(GameException):
+    def __init__(self, player_name: str, jail_cards: int):
+        self.message = f"Player {player_name} has only {jail_cards} jail cards"
+        super().__init__(self.message)
+
+class NoTargetPlayerException(GameException):
+    def __init__(self):
+        self.message = "Trade must have a target player"
+        super().__init__(self.message)
+
+class NoAssetIsBeingTradedException(GameException):
+    def __init__(self):
+        self.message = "Trade must have some assets being traded"
+        super().__init__(self.message)

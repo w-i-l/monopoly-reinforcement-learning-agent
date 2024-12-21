@@ -3,6 +3,7 @@ from models.property_group import PropertyGroup
 from models.property import Property
 from models.railway import Railway
 from models.utility import Utility
+from models.trade_offer import TradeOffer
 from models.tile import Tile
 from exceptions.exceptions import *
 from models.other_tiles import Jail, Go, GoToJail, FreeParking, Taxes, Chance, CommunityChest
@@ -332,6 +333,43 @@ class GameState:
         self.player_balances[player] -= rent
         self.player_balances[owner] += rent
         print(f"{player} paid ${rent} rent to {owner}")
+
+
+    def execute_trade_offer(self, trade_offer: TradeOffer):
+        if error := GameValidation.validate_trade_offer(self, trade_offer):
+            raise error
+        
+        source_player = trade_offer.source_player
+        target_player = trade_offer.target_player
+        
+        if trade_offer.properties_offered:
+            for property in trade_offer.properties_offered:
+                self.properties[source_player].remove(property)
+                self.properties[target_player].append(property)
+
+        if trade_offer.properties_requested:
+            for property in trade_offer.properties_requested:
+                self.properties[target_player].remove(property)
+                self.properties[source_player].append(property)
+
+        if trade_offer.money_offered:
+            self.player_balances[source_player] -= trade_offer.money_offered
+            self.player_balances[target_player] += trade_offer.money_offered
+
+        if trade_offer.money_requested:
+            self.player_balances[target_player] -= trade_offer.money_requested
+            self.player_balances[source_player] += trade_offer.money_requested
+
+        if trade_offer.jail_cards_offered:
+            self.escape_jail_cards[source_player] -= trade_offer.jail_cards_offered
+            self.escape_jail_cards[target_player] += trade_offer.jail_cards_offered
+
+        if trade_offer.jail_cards_requested:
+            self.escape_jail_cards[target_player] -= trade_offer.jail_cards_requested
+            self.escape_jail_cards[source_player] += trade_offer.jail_cards_requested
+
+        print(f"Trade executed: {trade_offer}")
+        
 
     def get_houses_for_player(self, player: Player):
         properties = [p for p in self.properties[player] if isinstance(p, Property)]

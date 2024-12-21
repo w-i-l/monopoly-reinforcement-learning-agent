@@ -7,6 +7,7 @@ from managers.community_chest_manager import CommunityChestManager
 from exceptions.exceptions import *
 from models.other_tiles import Chance, CommunityChest
 from utils.logger import ErrorLogger
+from managers.trade_manager import TradeManager
 
 class GameManager:
     def __init__(self, players: List[Player]):
@@ -15,6 +16,7 @@ class GameManager:
         self.dice_manager = DiceManager()
         self.chance_manager = ChanceManager()
         self.community_chest_manager = CommunityChestManager()
+        self.trade_manager = TradeManager()
                                     
 
     def play_turn(self):
@@ -74,7 +76,8 @@ class GameManager:
         
         # TODO: check if the player landed on chance/ community chest
         if isinstance(tile, Chance):
-            chance_card = self.chance_manager.draw_card(self.game_state, current_player)
+            dice_roll = self.dice_manager.roll()
+            chance_card = self.chance_manager.draw_card(self.game_state, current_player, dice_roll)
             try:
                 print("Performing chance card action", chance_card)
                 chance_card.action(*chance_card.args)
@@ -133,6 +136,12 @@ class GameManager:
 
         # TODO: Implement the logic for auctioning the property if the player does not buy it
 
+
+        # Check if the player wants to trade
+        trade_offers = current_player.get_trade_offers(self.game_state)
+        if trade_offers and trade_offers != []:
+            for trade_offer in trade_offers:
+                self.trade_manager.execute_trade(trade_offer, self.game_state)
 
         # Check if the player wants to downgrade properties
         self.__handle_downgrading_suggestions(current_player)

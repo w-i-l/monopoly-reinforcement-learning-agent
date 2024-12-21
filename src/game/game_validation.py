@@ -7,6 +7,7 @@ from models.property_group import PropertyGroup
 from models.property import Property
 from models.railway import Railway
 from models.utility import Utility
+from models.trade_offer import TradeOffer
 from models.tile import Tile
 
 if TYPE_CHECKING:
@@ -222,4 +223,79 @@ class GameValidation:
         if game_state.player_balances[player] < rent:
             return NotEnoughBalanceException(rent, game_state.player_balances[player])
         
+        return None
+    
+
+    @staticmethod
+    def validate_trade_offer(
+        game_state: GameState,
+        trade_offer: TradeOffer
+        ) -> Optional[GameException]:
+
+        if trade_offer.source_player not in game_state.players:
+            return PlayerDoesNotExistException(str(trade_offer.source_player))
+        
+        if not trade_offer.target_player:
+            return NoTargetPlayerException()
+                
+        if trade_offer.properties_offered and len(trade_offer.properties_offered) > 0:
+            for property in trade_offer.properties_offered:
+                if property not in game_state.is_owned:
+                    return PropertyNotOwnedException(str(property))
+                
+                if property not in game_state.properties[trade_offer.source_player]:
+                    return NotPropertyOwnerException(str(property), str(trade_offer.source_player))
+                
+                if property in trade_offer.properties_requested:
+                    return PropertyInBothOfferedException(str(property))
+                
+                if property in game_state.mortgaged_properties:
+                    return MortgagePropertyTradeException(str(property))
+                
+                if isinstance(property, Property):
+                    if game_state.houses[property.group][0] > 0 or game_state.hotels[property.group][0] > 0:
+                        return PropertyHasImprovementsException(str(property))
+                    
+        if trade_offer.properties_requested and len(trade_offer.properties_requested) > 0:
+            for property in trade_offer.properties_requested:
+                if property not in game_state.is_owned:
+                    return PropertyNotOwnedException(str(property))
+                
+                if property not in game_state.properties[trade_offer.target_player]:
+                    return NotPropertyOwnerException(str(property), str(trade_offer.target_player))
+                
+                if property in game_state.mortgaged_properties:
+                    return MortgagePropertyTradeException(str(property))
+                
+                if isinstance(property, Property):
+                    if game_state.houses[property.group][0] > 0 or game_state.hotels[property.group][0] > 0:
+                        return PropertyHasImprovementsException(str(property))
+                    
+        if trade_offer.jail_cards_offered:
+            if trade_offer.jail_cards_offered < 0:
+                return NegativeJailCardOfferedException(trade_offer.jail_cards_offered)
+            elif trade_offer.jail_cards_offered > game_state.escape_jail_cards[trade_offer.source_player]:
+                return NotEnoughJailCardsException(str(trade_offer.source_player), trade_offer.jail_cards_offered)
+            
+        if trade_offer.jail_cards_requested:
+            if trade_offer.jail_cards_requested < 0:
+                return NegativeJailCardRequestedException(trade_offer.jail_cards_requested)
+            elif trade_offer.jail_cards_requested > game_state.escape_jail_cards[trade_offer.target_player]:
+                return NotEnoughJailCardsException(str(trade_offer.target_player), trade_offer.jail_cards_requested)
+            
+
+        # verify if there is only money offered or requested
+        if trade_offer.properties_offered == [] and trade_offer.properties_requested == [] and\
+            trade_offer.jail_cards_offered == 0 and trade_offer.jail_cards_requested == 0:
+            return NoAssetIsBeingTradedException()
+
+        if trade_offer.money_offered:
+            if trade_offer.money_offered < 0:
+                return NegativeMoneyOfferedException(trade_offer.money_offered)
+        
+        if trade_offer.money_requested:
+            if trade_offer.money_requested < 0:
+                return NegativeMoneyRequestedException(trade_offer.money_requested)
+        
+                    
         return None
