@@ -154,11 +154,15 @@ class RandomAgent(Player):
                 jail_cards_requested = random.randint(0, game_state.escape_jail_cards[player])
 
                 for property in game_state.properties[self]:
-                    if random.choice([True, False]):
+                    if random.choice([True, False]) and\
+                        not property in game_state.mortgaged_properties and\
+                        (isinstance(property, Property) and game_state.houses[property.group][0] == 0 and game_state.hotels[property.group][0] == 0):
                         properties_offered.append(property)
 
                 for property in game_state.properties[player]:
-                    if random.choice([True, False]):
+                    if random.choice([True, False]) and\
+                        not property in game_state.mortgaged_properties and\
+                        (isinstance(property, Property) and game_state.houses[property.group][0] == 0 and game_state.hotels[property.group][0] == 0):
                         properties_requested.append(property)
 
                 if properties_offered == [] and properties_requested == [] and\
