@@ -2,6 +2,7 @@ from models.community_chest_card import CommunityChestCard
 from game.game_state import GameState
 from random import shuffle
 from typing import List
+from exceptions.exceptions import NoJailFreeCardCommunityChestException
 
 CAN_PRINT = False
 def custom_print(*args, **kwargs):
@@ -12,6 +13,7 @@ class CommunityChestManager:
     def __init__(self):
         self.community_chest_cards = self.__load_cards()
         self.__shuffle_cards()
+        self.get_out_of_jail_card_owner = None
 
 
     def __shuffle_cards(self):
@@ -26,12 +28,34 @@ class CommunityChestManager:
         card_id = self.__shuffled_cards.pop()
         card = self.community_chest_cards[card_id]
 
+        get_out_of_jail_card_id = 2
+        if card_id == get_out_of_jail_card_id:
+            if self.get_out_of_jail_card_owner == None:
+                self.get_out_of_jail_card_owner = player
+
+            elif self.get_out_of_jail_card_owner is not None:
+                return self.draw_card(game_state, player)
+
         return CommunityChestCard(
             id=card[0],
             description=card[1],
             action=card[2],
             args=(game_state, player, *card[3])
         )
+    
+
+    def use_get_out_of_jail_card(self, player):
+        if self.get_out_of_jail_card_owner is not None:
+            self.get_out_of_jail_card_owner = None
+            get_out_of_jail_card_id = 2
+            self.__shuffled_cards.append(get_out_of_jail_card_id)
+            return
+        
+        raise NoJailFreeCardCommunityChestException(player_name=player.name)
+    
+
+    def update_get_out_of_jail_card_owner(self, player): 
+        self.get_out_of_jail_card_owner = player
     
 
     def __move_player_to_start(self, game_state: GameState, player):

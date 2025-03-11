@@ -1,4 +1,3 @@
-# validation/game_validation.py
 from typing import Optional, TYPE_CHECKING
 from exceptions.exceptions import GameException
 from exceptions.exceptions import *
@@ -44,6 +43,8 @@ class GameValidation:
         if game_state.player_balances[player] < property.buyback_price:
             return NotEnoughBalanceException(property.buyback_price, game_state.player_balances[player])
         
+        return None
+        
 
     @staticmethod
     def validate_mortgage_property(game_state: GameState, player: Player, property: Tile) -> Optional[GameException]:
@@ -63,6 +64,7 @@ class GameValidation:
         
         return None
 
+
     @staticmethod
     def validate_place_house(game_state: GameState, player: Player, property_group: PropertyGroup) -> Optional[GameException]:
         if game_state.hotels[property_group][0] >= 1:
@@ -76,15 +78,15 @@ class GameValidation:
             if property in game_state.mortgaged_properties:
                 return MortgagePropertyHouseException(str(property))
 
-        group_properties = game_state.board.get_properties_by_group(property_group)
-        if not all(property in game_state.properties[player] for property in group_properties):
+        if not all(property in game_state.properties[player] for property in grouped_properties):
             return IncompletePropertyGroupException(str(property_group))
         
-        cost = property_group.house_cost() * len(group_properties)
+        cost = property_group.house_cost() * len(grouped_properties)
         if game_state.player_balances[player] < cost:
             return NotEnoughBalanceException(cost, game_state.player_balances[player])
         
         return None
+
 
     @staticmethod
     def validate_place_hotel(game_state: GameState, player: Player, property_group: PropertyGroup) -> Optional[GameException]:
@@ -96,13 +98,12 @@ class GameValidation:
             if property in game_state.mortgaged_properties:
                 return MortgagePropertyHotelException(str(property))
         
-        group_properties = game_state.board.get_properties_by_group(property_group)
-        if not all(property in game_state.properties[player] for property in group_properties):
+        if not all(property in game_state.properties[player] for property in grouped_properties):
             return IncompletePropertyGroupException(str(property_group))
         
-        if game_state.houses[property_group][0] < 4:
-            return InsufficientHousesException(str(property_group), 
-                                             game_state.houses[property_group][0], 4)
+        for number_of_houses in game_state.houses[property_group]:
+            if number_of_houses < 4:
+                return InsufficientHousesException(str(property_group), number_of_houses, 4)
         
         cost = property_group.hotel_cost()
         if game_state.player_balances[player] < cost:
@@ -110,32 +111,46 @@ class GameValidation:
         
         return None
 
+
     @staticmethod
     def validate_sell_house(game_state: GameState, player: Player, property_group: PropertyGroup) -> Optional[GameException]:
         if game_state.houses[property_group][0] == 0:
             return NoHousesToSellException(str(property_group))
+        
+        grouped_properties = game_state.board.get_properties_by_group(property_group)
+        for property in grouped_properties:
+            if property in game_state.mortgaged_properties:
+                return MortgagePropertyHouseException(str(property))
         
         if game_state.houses[property_group][1] != player:
             return NotImprovementOwnerException("houses", str(property_group), str(player))
         
         return None
 
+
     @staticmethod
     def validate_sell_hotel(game_state: GameState, player: Player, property_group: PropertyGroup) -> Optional[GameException]:
         if game_state.hotels[property_group][0] == 0:
             return NoHotelToSellException(str(property_group))
+        
+        grouped_properties = game_state.board.get_properties_by_group(property_group)
+        for property in grouped_properties:
+            if property in game_state.mortgaged_properties:
+                return MortgagePropertyHotelException(str(property))
         
         if game_state.hotels[property_group][1] != player:
             return NotImprovementOwnerException("hotel", str(property_group), str(player))
         
         return None
     
+
     @staticmethod
     def validate_get_out_of_jail(game_state: GameState, player: Player) -> Optional[GameException]:
         if not game_state.in_jail[player]:
             return NotInJailException(str(player))
         
         return None 
+
 
     @staticmethod
     def validate_use_escape_jail_card(game_state: GameState, player: Player) -> Optional[GameException]:
@@ -147,6 +162,7 @@ class GameValidation:
         
         return None
     
+
     @staticmethod
     def validate_pay_get_out_of_jail_fine(game_state: GameState, player: Player) -> Optional[GameException]:
         if not game_state.in_jail[player]:
@@ -157,12 +173,14 @@ class GameValidation:
         
         return None
     
+
     @staticmethod
     def validate_pay_tax(game_state: GameState, player: Player, tax: int) -> Optional[GameException]:
         if game_state.player_balances[player] < tax:
             return NotEnoughBalanceException(tax, game_state.player_balances[player])
         
         return None
+
 
     @staticmethod
     def validate_pay_rent(
@@ -276,12 +294,16 @@ class GameValidation:
                 return NegativeJailCardOfferedException(trade_offer.jail_cards_offered)
             elif trade_offer.jail_cards_offered > game_state.escape_jail_cards[trade_offer.source_player]:
                 return NotEnoughJailCardsException(str(trade_offer.source_player), trade_offer.jail_cards_offered)
+            elif trade_offer.jail_cards_offered > 2:
+                return InvalidJailCardOfferedException(trade_offer.jail_cards_offered, trade_offer.jail_cards_offered)
             
         if trade_offer.jail_cards_requested:
             if trade_offer.jail_cards_requested < 0:
                 return NegativeJailCardRequestedException(trade_offer.jail_cards_requested)
             elif trade_offer.jail_cards_requested > game_state.escape_jail_cards[trade_offer.target_player]:
                 return NotEnoughJailCardsException(str(trade_offer.target_player), trade_offer.jail_cards_requested)
+            elif trade_offer.jail_cards_requested > 2:
+                return InvalidJailCardRequestedException(trade_offer.jail_cards_requested, trade_offer.jail_cards_requested)
             
 
         # verify if there is only money offered or requested

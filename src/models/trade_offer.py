@@ -30,6 +30,15 @@ class TradeOffer:
         self.jail_cards_requested = jail_cards_requested
 
     def __str__(self):
+        return f"""{self.source_player} is offering:
+Properties: {self.properties_offered}
+Money: {self.money_offered}
+Jail Cards: {self.jail_cards_offered}
+to {self.target_player} for:
+Properties: {self.properties_requested}
+Money: {self.money_requested}
+Jail Cards: {self.jail_cards_requested}
+"""
         return f"{self.source_player} is offering {self.properties_offered} and {self.money_offered} and {self.jail_cards_offered} to {self.target_player} for {self.properties_requested} and {self.money_requested} and {self.jail_cards_requested}"
     
     def __repr__(self):

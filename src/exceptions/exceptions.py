@@ -94,12 +94,12 @@ class MortgagePropertyRentException(GameException):
 
 class MortgagePropertyHouseException(GameException):
     def __init__(self, property_name: str):
-        self.message = f"Cannot build house on mortgaged property {property_name}"
+        self.message = f"Cannot build/sell house on mortgaged property {property_name}"
         super().__init__(self.message)
 
 class MortgagePropertyHotelException(GameException):
     def __init__(self, property_name: str):
-        self.message = f"Cannot build hotel on mortgaged property {property_name}"
+        self.message = f"Cannot build/sell hotel on mortgaged property {property_name}"
         super().__init__(self.message)
 
 class PlayerInJailException(GameException):
@@ -165,4 +165,24 @@ class NoTargetPlayerException(GameException):
 class NoAssetIsBeingTradedException(GameException):
     def __init__(self):
         self.message = "Trade must have some assets being traded"
+        super().__init__(self.message)
+
+class NoJailFreeCardCommunityChestException(GameException):
+    def __init__(self, player_name: str):
+        self.message = f"Player `{player_name}` doesn't own a jail free card from community chest"
+        super().__init__(self.message)
+
+class NoJailFreeCardChanceException(GameException):
+    def __init__(self, player_name: str):
+        self.message = f"Player `{player_name}` doesn't own a jail free card from chance"
+        super().__init__(self.message)
+
+class InvalidJailCardOfferedException(GameException):
+    def __init__(self, player_name: str, jail_cards: int):
+        self.message = f"Player `{player_name}` cannot offer `{jail_cards}` jail cards"
+        super().__init__(self.message)
+
+class InvalidJailCardRequestedException(GameException):
+    def __init__(self, player_name: str, jail_cards: int):
+        self.message = f"Player `{player_name}` cannot request `{jail_cards}` jail cards"
         super().__init__(self.message)

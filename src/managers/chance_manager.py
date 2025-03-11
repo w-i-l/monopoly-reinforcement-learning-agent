@@ -2,7 +2,7 @@ from game.game_state import GameState
 from models.chance_card import ChanceCard
 from random import shuffle
 from typing import List
-
+from exceptions.exceptions import NotEnoughJailCardsException
 
 CAN_PRINT = False
 def custom_print(*args, **kwargs):
@@ -13,6 +13,7 @@ class ChanceManager:
     def __init__(self):
         self.chance_cards = self.__load_cards()
         self.__shuffle_cards()
+        self.get_out_of_jail_card_owner = None
 
 
     def __shuffle_cards(self):
@@ -31,12 +32,34 @@ class ChanceManager:
         if dice_roll is not None and card_id == 9: # Move player to nearest utility
             args = (*args, dice_roll)
 
+        get_out_of_jail_card_id = 1
+        if card_id == get_out_of_jail_card_id:
+            if self.get_out_of_jail_card_owner == None:
+                self.get_out_of_jail_card_owner = player
+
+            elif self.get_out_of_jail_card_owner is not None:
+                return self.draw_card(game_state, player)
+
         return ChanceCard(
             id=card[0],
             description=card[1],
             action=card[2],
             args=(game_state, player, *args)
         )
+    
+
+    def use_get_out_of_jail_card(self, player):
+        if self.get_out_of_jail_card_owner is not None:
+            self.get_out_of_jail_card_owner = None
+            get_out_of_jail_card_id = 1
+            self.__shuffled_cards.append(get_out_of_jail_card_id)
+            return
+        
+        raise NotEnoughJailCardsException(player_name=player.name)
+    
+
+    def update_get_out_of_jail_card_owner(self, player):
+        self.get_out_of_jail_card_owner = player
 
 
     def __move_player_to_nearest_utility(self, game_state: GameState, player, dice_roll: tuple[int, int]):

@@ -58,6 +58,12 @@ class GameManager:
             elif current_player.should_use_escape_jail_card(self.game_state):
                 self.game_state.use_escape_jail_card(current_player)
 
+                # remove the escape jail card from the player
+                if self.community_chest_manager.get_out_of_jail_card_owner == current_player:
+                    self.community_chest_manager.use_get_out_of_jail_card(current_player)
+                elif self.chance_manager.get_out_of_jail_card_owner == current_player:
+                    self.chance_manager.use_get_out_of_jail_card(current_player)
+
             # TODO: implement the logic for buying the escape jail card from other players
 
             # try to pay the fine
@@ -177,7 +183,12 @@ class GameManager:
         trade_offers = current_player.get_trade_offers(self.game_state)
         if trade_offers and trade_offers != []:
             for trade_offer in trade_offers:
-                self.trade_manager.execute_trade(trade_offer, self.game_state)
+                self.trade_manager.execute_trade(
+                    trade_offer, 
+                    self.game_state,
+                    self.chance_manager,
+                    self.community_chest_manager
+                )
 
         # Check if the player wants to downgrade properties
         self.__handle_downgrading_suggestions(current_player)

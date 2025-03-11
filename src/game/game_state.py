@@ -365,11 +365,14 @@ class GameState:
             self.player_balances[target_player] -= trade_offer.money_requested
             self.player_balances[source_player] += trade_offer.money_requested
 
-        if trade_offer.jail_cards_offered:
+        if trade_offer.jail_cards_offered == trade_offer.jail_cards_requested:
+            pass # No sense in trading jail cards
+
+        if trade_offer.jail_cards_offered != 0 and trade_offer.jail_cards_requested == 0:
             self.escape_jail_cards[source_player] -= trade_offer.jail_cards_offered
             self.escape_jail_cards[target_player] += trade_offer.jail_cards_offered
 
-        if trade_offer.jail_cards_requested:
+        if trade_offer.jail_cards_requested != 0 and trade_offer.jail_cards_offered == 0:
             self.escape_jail_cards[target_player] -= trade_offer.jail_cards_requested
             self.escape_jail_cards[source_player] += trade_offer.jail_cards_requested
 
