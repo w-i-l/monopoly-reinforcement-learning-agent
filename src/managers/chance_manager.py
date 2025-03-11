@@ -3,6 +3,12 @@ from models.chance_card import ChanceCard
 from random import shuffle
 from typing import List
 
+
+CAN_PRINT = False
+def custom_print(*args, **kwargs):
+    if CAN_PRINT:
+        print(*args, **kwargs)
+
 class ChanceManager:
     def __init__(self):
         self.chance_cards = self.__load_cards()
@@ -141,7 +147,7 @@ class ChanceManager:
     def __move_player_to_property(self, game_state: GameState, player, property_name: str):
         property_tile = game_state.board.get_tile_by_name(property_name)
         if property_tile is None:
-            print(game_state.board.tiles)
+            custom_print(game_state.board.tiles)
             exit(0)
         game_state.move_player_to_property(player, property_tile)
 
@@ -278,5 +284,5 @@ if __name__ == "__main__":
 
     for _ in range(33):
         card = chance_manager.draw_card(game_state, players[0])
-        print()
+        custom_print()
         card.action(*card.args)

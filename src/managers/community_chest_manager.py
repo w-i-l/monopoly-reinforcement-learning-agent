@@ -3,6 +3,11 @@ from game.game_state import GameState
 from random import shuffle
 from typing import List
 
+CAN_PRINT = False
+def custom_print(*args, **kwargs):
+    if CAN_PRINT:
+        print(*args, **kwargs)
+
 class CommunityChestManager:
     def __init__(self):
         self.community_chest_cards = self.__load_cards()
@@ -194,5 +199,5 @@ if __name__ == "__main__":
 
     for _ in range(17):
         card = chance_manager.draw_card(game_state, players[0])
-        print()
+        custom_print()
         card.action(*card.args)

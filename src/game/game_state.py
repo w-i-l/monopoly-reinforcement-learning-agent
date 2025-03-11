@@ -12,6 +12,11 @@ from game.game_validation import GameValidation
 
 # TODO: implement verification for all paths
 
+CAN_PRINT = False
+def custom_print(*args, **kwargs):
+    if CAN_PRINT:
+        custom_print(*args, **kwargs)
+
 class GameState:
     def __init__(self, players: list[Player]):
         self.players = players
@@ -41,14 +46,14 @@ class GameState:
         # verify if the player has passed go
         if property_position < player_position:
             self.player_balances[player] += 200
-            print(f"{player} passed Go and received $200")
+            custom_print(f"{player} passed Go and received $200")
 
         self.player_positions[player] = property_position
 
 
     def receive_get_out_of_jail_card(self, player: Player):
         self.escape_jail_cards[player] += 1
-        print(f"{player} received a Get Out of Jail card")
+        custom_print(f"{player} received a Get Out of Jail card")
 
 
     def pay_players(self, player: Player, amount: int):
@@ -56,7 +61,7 @@ class GameState:
             if other_player != player:
                 self.player_balances[player] -= amount
                 self.player_balances[other_player] += amount
-                print(f"{player} paid {other_player} ${amount}")
+                custom_print(f"{player} paid {other_player} ${amount}")
 
 
     def sent_player_to_jail(self, player: Player):
@@ -64,17 +69,17 @@ class GameState:
         self.doubles_rolled = 0
         self.turns_in_jail[player] = 0
         self.player_positions[player] = self.board.get_jail_id()
-        print(f"{player} is sent to jail")
+        custom_print(f"{player} is sent to jail")
 
 
     def move_player_backwards(self, player: Player, steps: int):
         self.player_positions[player] -= steps
-        print(f"{player} moved backwards {steps} steps")
+        custom_print(f"{player} moved backwards {steps} steps")
 
         # Check if player landed on Community Chest
         community_chest_tile = self.board.has_land_on_community_chest(self.player_positions[player])
         if community_chest_tile:
-            print(f"{player} landed on Community Chest")
+            custom_print(f"{player} landed on Community Chest")
             pass
 
         # Check if player landed on Taxes
@@ -83,18 +88,18 @@ class GameState:
             if tax_tile.tax > self.player_balances[player]:
                 raise NotEnoughBalanceException(tax_tile.tax, self.player_balances[player])
             self.player_balances[player] -= tax_tile.tax
-            print(f"{player} landed on {tax_tile.name} and paid ${tax_tile.tax}")
+            custom_print(f"{player} landed on {tax_tile.name} and paid ${tax_tile.tax}")
 
 
     def move_player(self, player: Player, dice: tuple[int, int]):
         if self.in_jail[player]:
-            print(f"{player} is in jail")
+            custom_print(f"{player} is in jail")
             raise PlayerInJailException(player)
 
         self.doubles_rolled += 1 if dice[0] == dice[1] else 0
         if self.doubles_rolled == 3:
             self.sent_player_to_jail(player)
-            print(f"{player} rolled doubles 3 times and is sent to jail")
+            custom_print(f"{player} rolled doubles 3 times and is sent to jail")
             return
         
         rolled = dice[0] + dice[1]
@@ -102,29 +107,29 @@ class GameState:
         
         # Check if player passed Go
         if self.player_positions[player] >= 40:
-            print(f"{player} passed Go and received $200")
+            custom_print(f"{player} passed Go and received $200")
             self.player_balances[player] += 200
 
         # Normalize position
         self.player_positions[player] %= 40
-        print(f"{player} landed on {self.board.tiles[self.player_positions[player]]}")
+        custom_print(f"{player} landed on {self.board.tiles[self.player_positions[player]]}")
         
         # Check if player landed on Go To Jail
         if self.board.has_landed_on_go_to_jail(self.player_positions[player]):
             self.sent_player_to_jail(player)
-            print(f"{player} landed on Go To Jail and is sent to jail")
+            custom_print(f"{player} landed on Go To Jail and is sent to jail")
             return
         
         # Check if player landed on Chance
         chance_tile = self.board.has_land_on_chance(self.player_positions[player])
         if chance_tile:
-            print(f"{player} landed on Chance")
+            custom_print(f"{player} landed on Chance")
             pass
 
         # Check if player landed on Community Chest
         community_chest_tile = self.board.has_land_on_community_chest(self.player_positions[player])
         if community_chest_tile:
-            print(f"{player} landed on Community Chest")
+            custom_print(f"{player} landed on Community Chest")
             pass
 
         # Check if player landed on Taxes
@@ -133,7 +138,7 @@ class GameState:
             if tax_tile.tax > self.player_balances[player]:
                 raise NotEnoughBalanceException(tax_tile.tax, self.player_balances[player])
             self.player_balances[player] -= tax_tile.tax
-            print(f"{player} landed on {tax_tile.name} and paid ${tax_tile.tax}")
+            custom_print(f"{player} landed on {tax_tile.name} and paid ${tax_tile.tax}")
 
     def buy_property(self, player: Player, property: Tile):
         if error := GameValidation.validate_buy_property(self, player, property):
@@ -143,26 +148,26 @@ class GameState:
         self.is_owned.add(property)
         self.player_balances[player] -= property.price
 
-        print(f"{player} bought {property} remaining balance: ${self.player_balances[player]}")
-        print(self.properties)
+        custom_print(f"{player} bought {property} remaining balance: ${self.player_balances[player]}")
+        custom_print(self.properties)
 
 
     def unmortgage_property(self, player: Player, property: Tile):
         if error := GameValidation.validate_unmortgage_property(self, player, property):
             raise error
         
-        print(f"{player} unmortaging {property}")
+        custom_print(f"{player} unmortaging {property}")
         self.mortgaged_properties.remove(property)
         self.player_balances[player] -= property.buyback_price
 
 
     def mortgage_property(self, player: Player, property: Tile):
-        print(property)
-        print(self.is_owned)    
+        custom_print(property)
+        custom_print(self.is_owned)    
         if error := GameValidation.validate_mortgage_property(self, player, property):
             raise error
         
-        print(f"{player} mortaging {property}")
+        custom_print(f"{player} mortaging {property}")
         self.mortgaged_properties.add(property)
         self.player_balances[player] += property.mortgage
 
@@ -174,7 +179,7 @@ class GameState:
         if error := GameValidation.validate_place_house(self, player, property_group):
             raise error
         
-        print(f"{player} placed a house on {property_group}")
+        custom_print(f"{player} placed a house on {property_group}")
         cost = property_group.house_cost() * len(self.board.get_properties_by_group(property_group))
         self.houses[property_group] = (self.houses[property_group][0] + 1, player)
         self.player_balances[player] -= cost
@@ -183,7 +188,7 @@ class GameState:
         if error := GameValidation.validate_place_hotel(self, player, property_group):
             raise error
         
-        print(f"{player} placed a hotel on {property_group}")
+        custom_print(f"{player} placed a hotel on {property_group}")
         cost = property_group.hotel_cost()
         self.hotels[property_group] = (1, player)
         self.houses[property_group] = (0, None)
@@ -208,7 +213,7 @@ class GameState:
         if error := GameValidation.validate_sell_house(self, player, property_group):
             raise error
         
-        print(f"{player} sold a house on {property_group}")
+        custom_print(f"{player} sold a house on {property_group}")
         group_properties = self.board.get_properties_by_group(property_group)
         cost = property_group.house_cost() * len(group_properties) // 2
         self.houses[property_group] = (self.houses[property_group][0] - 1, player)
@@ -218,7 +223,7 @@ class GameState:
         if error := GameValidation.validate_sell_hotel(self, player, property_group):
             raise error
         
-        print(f"{player} sold a hotel on {property_group}")
+        custom_print(f"{player} sold a hotel on {property_group}")
         cost = property_group.hotel_cost() // 2
         self.hotels[property_group] = (0, None)
         self.houses[property_group] = (4, player)
@@ -232,7 +237,7 @@ class GameState:
         if error := GameValidation.validate_get_out_of_jail(self, player):
             raise error
         
-        print(f"{player} got out of jail by rolling doubles")
+        custom_print(f"{player} got out of jail by rolling doubles")
         self.in_jail[player] = False
         self.player_positions[player] = 10
         self.turns_in_jail[player] = 0
@@ -241,7 +246,7 @@ class GameState:
         if error := GameValidation.validate_use_escape_jail_card(self, player):
             raise error
         
-        print(f"{player} used a Get Out of Jail card")
+        custom_print(f"{player} used a Get Out of Jail card")
         self.escape_jail_cards[player] -= 1
         self.in_jail[player] = False
         self.player_positions[player] = 10
@@ -251,14 +256,14 @@ class GameState:
         if error := GameValidation.validate_pay_get_out_of_jail_fine(self, player):
             raise error
         
-        print(f"{player} paid ${self.board.get_jail_fine()} to get out of jail")
+        custom_print(f"{player} paid ${self.board.get_jail_fine()} to get out of jail")
         self.player_balances[player] -= self.board.get_jail_fine()
         self.in_jail[player] = False
         self.player_positions[player] = 10
         self.turns_in_jail[player] = 0
 
     def count_turn_in_jail(self, player: Player):
-        print(f"{player} is in jail for {self.turns_in_jail[player]} turns")
+        custom_print(f"{player} is in jail for {self.turns_in_jail[player]} turns")
         self.turns_in_jail[player] += 1
 
     def pay_tax(self, player: Player, tax: int):
@@ -266,12 +271,12 @@ class GameState:
             raise error
         
         self.player_balances[player] -= tax
-        print(f"{player} paid ${tax} tax")
+        custom_print(f"{player} paid ${tax} tax")
 
 
     def receive_income(self, player: Player, amount: int):
         self.player_balances[player] += amount
-        print(f"{player} received ${amount}")
+        custom_print(f"{player} received ${amount}")
 
     
     def receive_from_players(self, player: Player, amount: int):
@@ -279,7 +284,7 @@ class GameState:
             if other_player != player:
                 self.player_balances[other_player] -= amount
                 self.player_balances[player] += amount
-                print(f"{player} received ${amount} from {other_player}")
+                custom_print(f"{player} received ${amount} from {other_player}")
 
     def pay_rent(
             self, 
@@ -332,7 +337,7 @@ class GameState:
             
         self.player_balances[player] -= rent
         self.player_balances[owner] += rent
-        print(f"{player} paid ${rent} rent to {owner}")
+        custom_print(f"{player} paid ${rent} rent to {owner}")
 
 
     def execute_trade_offer(self, trade_offer: TradeOffer):
@@ -368,7 +373,7 @@ class GameState:
             self.escape_jail_cards[target_player] -= trade_offer.jail_cards_requested
             self.escape_jail_cards[source_player] += trade_offer.jail_cards_requested
 
-        print(f"Trade executed: {trade_offer}")
+        custom_print(f"Trade executed: {trade_offer}")
         
 
     def get_houses_for_player(self, player: Player):
@@ -398,13 +403,13 @@ if __name__ == "__main__":
     while True:
         player = game_state.players[game_state.current_player_index]
         dice = (random.randint(1, 6), random.randint(1, 6))
-        print(f"{player} rolled {dice}")
+        custom_print(f"{player} rolled {dice}")
         game_state.move_player(player, dice)
         try:
             property = game_state.board.tiles[game_state.player_positions[player]]
             if isinstance(property, Property) or isinstance(property, Railway) or isinstance(property, Utility):
                 game_state.buy_property(player, game_state.board.tiles[game_state.player_positions[player]])
         except GameException as e:
-            print(e.message)
+            custom_print(e.message)
         game_state.change_turn()
         input()

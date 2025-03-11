@@ -8,6 +8,12 @@ from typing import List
 from game.game_state import GameState
 from game.game_validation import GameValidation
 
+
+CAN_PRINT = False
+def custom_print(*args, **kwargs):
+    if CAN_PRINT:
+        print(*args, **kwargs)
+
 class TradeManager:
     def __init__(self):
         self.active_trades = []
@@ -24,7 +30,7 @@ class TradeManager:
 
 
     def execute_trade(self, trade_offer: TradeOffer, game_state: GameState):
-        print(f"Checking if trade is valid: {trade_offer}")
+        custom_print(f"Checking if trade is valid: {trade_offer}")
 
         # Check if the trade is valid
         if error := GameValidation.validate_trade_offer(game_state, trade_offer):
@@ -32,7 +38,7 @@ class TradeManager:
         
         # Check if the players want to trade
         if trade_offer.target_player.should_accept_trade_offer(game_state, trade_offer):
-            print(f"Executing trade: {trade_offer}")
+            custom_print(f"Executing trade: {trade_offer}")
             game_state.execute_trade_offer(trade_offer)
         
 

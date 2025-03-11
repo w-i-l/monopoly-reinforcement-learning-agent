@@ -9,6 +9,11 @@ from models.other_tiles import Chance, CommunityChest
 from utils.logger import ErrorLogger
 from managers.trade_manager import TradeManager
 
+CAN_PRINT = False
+def custom_print(*args):
+    if CAN_PRINT:
+        print(*args)
+
 class GameManager:
     def __init__(self, players: List[Player]):
         self.players = players
@@ -24,9 +29,9 @@ class GameManager:
         current_player = self.players[current_palayer_index]
 
         # TODO: Verify if the player can play - check if the player has any money left
-        if self.game_state.player_balances[current_player] <= 0:
-            print(f"{current_player} is bankrupt")
-            print("GAME OVER")
+        if self.game_state.player_balances[current_player] < 0:
+            custom_print(f"{current_player} is bankrupt")
+            custom_print("GAME OVER")
             return -1
         
         dice_roll = None
@@ -40,7 +45,14 @@ class GameManager:
 
             # if the player has been in jail for 3 turns, he must pay the fine
             elif self.game_state.turns_in_jail[current_player] == 2:
-                self.game_state.pay_get_out_of_jail_fine(current_player)
+                try:
+                    self.game_state.pay_get_out_of_jail_fine(current_player)
+                except Exception as e:
+                    if isinstance(e, NotEnoughBalanceException):
+                        # No money to pay the fine
+                        custom_print(f"{current_player} is bankrupt")
+                        custom_print("GAME OVER")
+                        return -1
 
             # try to use the escape jail card
             elif current_player.should_use_escape_jail_card(self.game_state):
@@ -50,7 +62,14 @@ class GameManager:
 
             # try to pay the fine
             elif current_player.should_pay_get_out_of_jail_fine(self.game_state):
-                self.game_state.pay_get_out_of_jail_fine(current_player)
+                try:
+                    self.game_state.pay_get_out_of_jail_fine(current_player)
+                except Exception as e:
+                    if isinstance(e, NotEnoughBalanceException):
+                        # No money to pay the fine
+                        custom_print(f"{current_player} is bankrupt")
+                        custom_print("GAME OVER")
+                        return -1
 
             # count the turn in jail
             else:
@@ -61,10 +80,18 @@ class GameManager:
         # Roll the dice if the player did not roll a double in attempt to get out of jail
         if dice_roll is None:
             dice_roll = self.dice_manager.roll()
-        print(f"{current_player} rolled {dice_roll[0]} and {dice_roll[1]}")
+        custom_print(f"{current_player} rolled {dice_roll[0]} and {dice_roll[1]}")
 
         # Move the player
-        self.game_state.move_player(current_player, dice_roll)
+        try:
+            self.game_state.move_player(current_player, dice_roll)
+        except Exception as e:
+            # Landed on a tax tile
+            if isinstance(e, NotEnoughBalanceException):
+                # No money to pay 
+                custom_print(f"{current_player} is bankrupt")
+                custom_print("GAME OVER")
+                return -1
 
         # check if the player went to jail
         if self.game_state.player_positions[current_player] == self.game_state.board.get_jail_id():
@@ -79,32 +106,38 @@ class GameManager:
             dice_roll = self.dice_manager.roll()
             chance_card = self.chance_manager.draw_card(self.game_state, current_player, dice_roll)
             try:
-                print("Performing chance card action", chance_card)
+                custom_print("Performing chance card action", chance_card)
                 chance_card.action(*chance_card.args)
             except Exception as e:
                 if isinstance(e, NotEnoughBalanceException):
-                    raise e
+                    # No money to pay
+                    custom_print(f"{current_player} is bankrupt")
+                    custom_print("GAME OVER")
+                    return -1
                 
                 ErrorLogger.log_error(e)
-                print("Error in chance card action")
+                custom_print("Error in chance card action")
                 return -1
 
         elif isinstance(tile, CommunityChest):
             community_chest_card = self.community_chest_manager.draw_card(self.game_state, current_player)
             try:
-                print("Performing community chest card action", community_chest_card)
+                custom_print("Performing community chest card action", community_chest_card)
                 community_chest_card.action(*community_chest_card.args)
             except Exception as e:
                 if isinstance(e, NotEnoughBalanceException):
-                    raise e
+                    # No money to pay
+                    custom_print(f"{current_player} is bankrupt")
+                    custom_print("GAME OVER")
+                    return -1
                 
                 ErrorLogger.log_error(e)
-                print("Error in community chest card action")
+                custom_print("Error in community chest card action")
                 return -1
         
         # Check if the player landed on an owned property
-        print(tile)
-        print(self.game_state.is_owned)
+        custom_print(tile)
+        custom_print(self.game_state.is_owned)
         if tile in self.game_state.is_owned and\
            tile not in self.game_state.properties[current_player] and\
            tile not in self.game_state.mortgaged_properties:
@@ -113,11 +146,14 @@ class GameManager:
                 self.game_state.pay_rent(current_player, tile, dice_roll)
             except Exception as e:
                 if isinstance(e, NotEnoughBalanceException):
-                    raise e
+                    # No money to pay rent
+                    custom_print(f"{current_player} is bankrupt")
+                    custom_print("GAME OVER")
+                    return -1
                 
                 # TODO: Handle player bankruptcy
                 ErrorLogger.log_error(e)
-                print("Player does not have enough balance to pay rent")
+                custom_print("Player does not have enough balance to pay rent")
                 return -1
 
         # Check if the player landed on an unowned property
@@ -127,11 +163,11 @@ class GameManager:
                     self.game_state.buy_property(current_player, tile)
                 except Exception as e:
                     if isinstance(e, NotEnoughBalanceException):
-                        raise e
+                        custom_print(f"{current_player} was unable to buy the property")
                 
                     # TODO: Handle player bankruptcy
                     ErrorLogger.log_error(e)
-                    print("Player does not have enough balance to buy the property")
+                    custom_print("Player does not have enough balance to buy the property")
                     return -1
 
         # TODO: Implement the logic for auctioning the property if the player does not buy it
@@ -186,7 +222,7 @@ class GameManager:
             
     def __handle_mortgaging_suggestions(self, current_player):
         suggestions = current_player.get_mortgaging_suggestions(self.game_state)
-        # print("Mortgaging suggestions: ", suggestions)
+        # custom_print("Mortgaging suggestions: ", suggestions)
         for suggestion in suggestions:
             try:
                 self.game_state.mortgage_property(current_player, suggestion)
@@ -196,12 +232,12 @@ class GameManager:
                 
                 # TODO: Handle player bankruptcy
                 ErrorLogger.log_error(e)
-                print("Player does not have enough balance to mortgage the property")
+                custom_print("Player does not have enough balance to mortgage the property")
                 return -1
             
     def __handle_upgrading_suggestions(self, current_player):
         suggestions = current_player.get_upgrading_suggestions(self.game_state)
-        # print("Upgrading suggestions: ", suggestions)
+        # custom_print("Upgrading suggestions: ", suggestions)
         for suggestion in suggestions:
             try:
                 self.game_state.update_property_group(current_player, suggestion)
@@ -211,7 +247,7 @@ class GameManager:
                 
                 # TODO: Handle player bankruptcy
                 ErrorLogger.log_error(e)
-                print("Player does not have enough balance to upgrade the property")
+                custom_print("Player does not have enough balance to upgrade the property")
                 return -1
             
     
@@ -224,6 +260,6 @@ class GameManager:
 
     def change_turn(self):
         self.game_state.change_turn()
-        print("\n\n")
-        print(f"Next player: {self.players[self.game_state.current_player_index]}")
-        print(self.game_state.player_balances)
+        custom_print("\n\n")
+        custom_print(f"Next player: {self.players[self.game_state.current_player_index]}")
+        custom_print(self.game_state.player_balances)
