@@ -13,6 +13,7 @@ from models.property import Property
 from models.railway import Railway
 from models.utility import Utility
 from models.property_group import PropertyGroup
+from models.other_tiles import Taxes, Jail
 
 CAN_PRINT = False
 def custom_print(*args):
@@ -234,17 +235,45 @@ class GameManager:
                 custom_print("GAME OVER")
                 return -1
 
-        # check if the player went to jail
+        
         current_position = self.game_state.player_positions[current_player]
-        if current_position == self.game_state.board.get_jail_id() and self.game_state.in_jail[current_player]:
+        tile = self.game_state.board.tiles[current_position]
+
+        # check if the player went to jail
+        if isinstance(tile, Jail) and self.game_state.in_jail[current_player]:
             self.event_manager.register_event(
                 EventType.PLAYER_WENT_TO_JAIL,
                 player=current_player,
                 description=f"{current_player} was sent to jail"
             )
+
+            self.event_manager.register_event(
+                EventType.TURN_ENDED,
+                player=current_player,
+                description=f"{current_player}'s turn ended"
+            )
             return
-        
-        tile = self.game_state.board.tiles[current_position]
+
+        # Check if player landed on a Tax tile
+        if isinstance(tile, Taxes):
+            try: 
+                self.game_state.pay_tax(current_player, tile.tax)
+                self.event_manager.register_event(
+                    EventType.TAX_PAID,
+                    player=current_player,
+                    amount=tile.tax,
+                    description=f"{current_player} paid ${tile.tax} in taxes"
+                )
+            except Exception as e:
+                if isinstance(e, NotEnoughBalanceException):
+                    self.event_manager.register_event(
+                        EventType.PLAYER_BANKRUPT,
+                        player=current_player,
+                        amount=self.game_state.player_balances[current_player]
+                    )
+                    custom_print(f"{current_player} is bankrupt")
+                    custom_print("GAME OVER")
+                    return -1
 
         
         # Handle landing on chance/community chest

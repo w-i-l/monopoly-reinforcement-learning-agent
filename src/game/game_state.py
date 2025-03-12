@@ -119,26 +119,7 @@ class GameState:
             self.sent_player_to_jail(player)
             custom_print(f"{player} landed on Go To Jail and is sent to jail")
             return
-        
-        # Check if player landed on Chance
-        chance_tile = self.board.has_land_on_chance(self.player_positions[player])
-        if chance_tile:
-            custom_print(f"{player} landed on Chance")
-            pass
 
-        # Check if player landed on Community Chest
-        community_chest_tile = self.board.has_land_on_community_chest(self.player_positions[player])
-        if community_chest_tile:
-            custom_print(f"{player} landed on Community Chest")
-            pass
-
-        # Check if player landed on Taxes
-        tax_tile = self.board.has_landed_on_tax(self.player_positions[player])
-        if tax_tile:
-            if tax_tile.tax > self.player_balances[player]:
-                raise NotEnoughBalanceException(tax_tile.tax, self.player_balances[player])
-            self.player_balances[player] -= tax_tile.tax
-            custom_print(f"{player} landed on {tax_tile.name} and paid ${tax_tile.tax}")
 
     def buy_property(self, player: Player, property: Tile):
         if error := GameValidation.validate_buy_property(self, player, property):
@@ -171,9 +152,11 @@ class GameState:
         self.mortgaged_properties.add(property)
         self.player_balances[player] += property.mortgage
 
+
     def change_turn(self):
         self.current_player_index = (self.current_player_index + 1) % len(self.players)
         self.doubles_rolled = 0
+
 
     def place_house(self, player: Player, property_group: PropertyGroup):
         if error := GameValidation.validate_place_house(self, player, property_group):
@@ -183,6 +166,7 @@ class GameState:
         cost = property_group.house_cost() * len(self.board.get_properties_by_group(property_group))
         self.houses[property_group] = (self.houses[property_group][0] + 1, player)
         self.player_balances[player] -= cost
+
 
     def place_hotel(self, player: Player, property_group: PropertyGroup):
         if error := GameValidation.validate_place_hotel(self, player, property_group):
@@ -219,6 +203,7 @@ class GameState:
         self.houses[property_group] = (self.houses[property_group][0] - 1, player)
         self.player_balances[player] += cost
 
+
     def sell_hotel(self, player: Player, property_group: PropertyGroup):
         if error := GameValidation.validate_sell_hotel(self, player, property_group):
             raise error
@@ -228,6 +213,7 @@ class GameState:
         self.hotels[property_group] = (0, None)
         self.houses[property_group] = (4, player)
         self.player_balances[player] += cost
+
 
     def get_out_of_jail(self, player: Player):
         '''
@@ -242,6 +228,7 @@ class GameState:
         self.player_positions[player] = 10
         self.turns_in_jail[player] = 0
 
+
     def use_escape_jail_card(self, player: Player):
         if error := GameValidation.validate_use_escape_jail_card(self, player):
             raise error
@@ -251,6 +238,7 @@ class GameState:
         self.in_jail[player] = False
         self.player_positions[player] = 10
         self.turns_in_jail[player] = 0
+
 
     def pay_get_out_of_jail_fine(self, player: Player):
         if error := GameValidation.validate_pay_get_out_of_jail_fine(self, player):
@@ -262,9 +250,11 @@ class GameState:
         self.player_positions[player] = 10
         self.turns_in_jail[player] = 0
 
+
     def count_turn_in_jail(self, player: Player):
         custom_print(f"{player} is in jail for {self.turns_in_jail[player]} turns")
         self.turns_in_jail[player] += 1
+
 
     def pay_tax(self, player: Player, tax: int):
         if error := GameValidation.validate_pay_tax(self, player, tax):
@@ -388,6 +378,7 @@ class GameState:
             for property in properties 
             if property.group in groups_with_houses
         }
+
 
     def get_hotels_for_player(self, player: Player):
         properties = [p for p in self.properties[player] if isinstance(p, Property)]
