@@ -104,16 +104,19 @@ class GameManager:
                         amount=self.game_state.board.get_jail_fine(),
                         description=f"{current_player} paid ${self.game_state.board.get_jail_fine()} jail fine"
                     )
+                except NotEnoughBalanceException:
+                    self.event_manager.register_event(
+                        EventType.PLAYER_BANKRUPT,
+                        player=current_player,
+                        amount=self.game_state.player_balances[current_player]
+                    )
+                    custom_print(f"{current_player} is bankrupt")
+                    custom_print("GAME OVER")
+                    return -1
                 except Exception as e:
-                    if isinstance(e, NotEnoughBalanceException):
-                        self.event_manager.register_event(
-                            EventType.PLAYER_BANKRUPT,
-                            player=current_player,
-                            amount=self.game_state.player_balances[current_player]
-                        )
-                        custom_print(f"{current_player} is bankrupt")
-                        custom_print("GAME OVER")
-                        return -1
+                    ErrorLogger.log_error(e)
+                    raise e
+                    
 
             # try to use the escape jail card
             elif current_player.should_use_escape_jail_card(self.game_state):
@@ -152,16 +155,18 @@ class GameManager:
                         amount=self.game_state.board.get_jail_fine(),
                         description=f"{current_player} paid ${self.game_state.board.get_jail_fine()} jail fine"
                     )
+                except NotEnoughBalanceException:
+                    self.event_manager.register_event(
+                        EventType.PLAYER_BANKRUPT,
+                        player=current_player,
+                        amount=self.game_state.player_balances[current_player]
+                    )
+                    custom_print(f"{current_player} is bankrupt")
+                    custom_print("GAME OVER")
+                    return -1
                 except Exception as e:
-                    if isinstance(e, NotEnoughBalanceException):
-                        self.event_manager.register_event(
-                            EventType.PLAYER_BANKRUPT,
-                            player=current_player,
-                            amount=self.game_state.player_balances[current_player]
-                        )
-                        custom_print(f"{current_player} is bankrupt")
-                        custom_print("GAME OVER")
-                        return -1
+                    ErrorLogger.log_error(e)
+                    raise e
 
             # count the turn in jail
             else:
@@ -223,17 +228,18 @@ class GameManager:
                 additional_data={"position": new_position, "dice_roll": dice_roll}
             )
             
+        except NotEnoughBalanceException:
+            self.event_manager.register_event(
+                EventType.PLAYER_BANKRUPT,
+                player=current_player,
+                amount=self.game_state.player_balances[current_player]
+            )
+            custom_print(f"{current_player} is bankrupt")
+            custom_print("GAME OVER")
+            return -1
         except Exception as e:
-            # Landed on a tax tile
-            if isinstance(e, NotEnoughBalanceException):
-                self.event_manager.register_event(
-                    EventType.PLAYER_BANKRUPT,
-                    player=current_player,
-                    amount=self.game_state.player_balances[current_player]
-                )
-                custom_print(f"{current_player} is bankrupt")
-                custom_print("GAME OVER")
-                return -1
+            ErrorLogger.log_error(e)
+            raise e
 
         
         current_position = self.game_state.player_positions[current_player]
@@ -264,16 +270,18 @@ class GameManager:
                     amount=tile.tax,
                     description=f"{current_player} paid ${tile.tax} in taxes"
                 )
+            except NotEnoughBalanceException:
+                self.event_manager.register_event(
+                    EventType.PLAYER_BANKRUPT,
+                    player=current_player,
+                    amount=self.game_state.player_balances[current_player]
+                )
+                custom_print(f"{current_player} is bankrupt")
+                custom_print("GAME OVER")
+                return -1
             except Exception as e:
-                if isinstance(e, NotEnoughBalanceException):
-                    self.event_manager.register_event(
-                        EventType.PLAYER_BANKRUPT,
-                        player=current_player,
-                        amount=self.game_state.player_balances[current_player]
-                    )
-                    custom_print(f"{current_player} is bankrupt")
-                    custom_print("GAME OVER")
-                    return -1
+                ErrorLogger.log_error(e)
+                raise e
 
         
         # Handle landing on chance/community chest
@@ -292,20 +300,19 @@ class GameManager:
                 
                 # Execute the card action
                 chance_card.action(*chance_card.args)
+            except NotEnoughBalanceException:
+                self.event_manager.register_event(
+                    EventType.PLAYER_BANKRUPT,
+                    player=current_player,
+                    amount=self.game_state.player_balances[current_player]
+                )
+                custom_print(f"{current_player} is bankrupt")
+                custom_print("GAME OVER")
+                return -1
             except Exception as e:
-                if isinstance(e, NotEnoughBalanceException):
-                    self.event_manager.register_event(
-                        EventType.PLAYER_BANKRUPT,
-                        player=current_player,
-                        amount=self.game_state.player_balances[current_player]
-                    )
-                    custom_print(f"{current_player} is bankrupt")
-                    custom_print("GAME OVER")
-                    return -1
-                
                 ErrorLogger.log_error(e)
                 custom_print("Error in chance card action")
-                return -1
+                raise e
 
         elif isinstance(tile, CommunityChest):
             self.event_manager.register_event(
@@ -321,20 +328,20 @@ class GameManager:
                 
                 # Execute the card action
                 community_chest_card.action(*community_chest_card.args)
+
+            except NotEnoughBalanceException:
+                self.event_manager.register_event(
+                    EventType.PLAYER_BANKRUPT,
+                    player=current_player,
+                    amount=self.game_state.player_balances[current_player]
+                )
+                custom_print(f"{current_player} is bankrupt")
+                custom_print("GAME OVER")
+                return -1
             except Exception as e:
-                if isinstance(e, NotEnoughBalanceException):
-                    self.event_manager.register_event(
-                        EventType.PLAYER_BANKRUPT,
-                        player=current_player,
-                        amount=self.game_state.player_balances[current_player]
-                    )
-                    custom_print(f"{current_player} is bankrupt")
-                    custom_print("GAME OVER")
-                    return -1
-                
                 ErrorLogger.log_error(e)
                 custom_print("Error in community chest card action")
-                return -1
+                raise e
         
         # Check if the player landed on an owned property
         custom_print(tile)
@@ -353,7 +360,7 @@ class GameManager:
                         break
                 
                 # Calculate rent before paying it
-                rent_amount = self._calculate_rent(tile, owner, dice_roll)
+                rent_amount = self.__calculate_rent(tile, owner, dice_roll)
                 
                 # Register rent event
                 self.event_manager.register_event(
@@ -367,22 +374,20 @@ class GameManager:
                 
                 # Process the rent payment
                 self.game_state.pay_rent(current_player, tile, dice_roll)
-                
+            
+            except NotEnoughBalanceException:
+                self.event_manager.register_event(
+                    EventType.PLAYER_BANKRUPT,
+                    player=current_player,
+                    amount=self.game_state.player_balances[current_player]
+                )
+                custom_print(f"{current_player} is bankrupt")
+                custom_print("GAME OVER")
+                return -1
             except Exception as e:
-                if isinstance(e, NotEnoughBalanceException):
-                    self.event_manager.register_event(
-                        EventType.PLAYER_BANKRUPT,
-                        player=current_player,
-                        amount=self.game_state.player_balances[current_player]
-                    )
-                    custom_print(f"{current_player} is bankrupt")
-                    custom_print("GAME OVER")
-                    return -1
-                
-                # Other errors
                 ErrorLogger.log_error(e)
                 custom_print("Player does not have enough balance to pay rent")
-                return -1
+                raise e
 
         # Check if the player landed on an unowned property
         elif tile not in self.game_state.is_owned:
@@ -400,21 +405,21 @@ class GameManager:
                     
                     # Process the purchase
                     self.game_state.buy_property(current_player, tile)
-                    
+                
+                except NotEnoughBalanceException:
+                    self.event_manager.register_event(
+                        EventType.MONEY_PAID,
+                        player=current_player,
+                        amount=price,
+                        description=f"{current_player} was unable to buy {tile} due to insufficient funds"
+                    )
+                    custom_print(f"{current_player} is bankrupt")
+                    custom_print("GAME OVER")
+                    return -1
                 except Exception as e:
-                    if isinstance(e, NotEnoughBalanceException):
-                        self.event_manager.register_event(
-                            EventType.MONEY_PAID,
-                            player=current_player,
-                            amount=price,
-                            description=f"{current_player} was unable to buy {tile} due to insufficient funds"
-                        )
-                        custom_print(f"{current_player} was unable to buy the property")
-                    
-                    # Other errors
                     ErrorLogger.log_error(e)
                     custom_print("Player does not have enough balance to buy the property")
-                    return -1
+                    raise e
             else:
                 # TODO: Implement auction logic when player doesn't buy
                 self.event_manager.register_event(
@@ -543,7 +548,8 @@ class GameManager:
         custom_print(f"Next player: {self.players[self.game_state.current_player_index]}")
         custom_print(self.game_state.player_balances)
 
-    def _calculate_rent(self, property, owner, dice_roll: tuple[int, int] = None) -> int:
+
+    def __calculate_rent(self, property, owner, dice_roll: tuple[int, int] = None) -> int:
         """Helper method to calculate rent for a property"""
         from models.property import Property
         from models.railway import Railway
