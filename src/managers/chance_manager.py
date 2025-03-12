@@ -29,7 +29,7 @@ class ChanceManager:
         self.__shuffled_cards = list(range(len(self.chance_cards)))
         shuffle(self.__shuffled_cards)
 
-    def draw_card(self, game_state: GameState, player, dice_roll: tuple[int, int] = None) -> ChanceCard:
+    def draw_card(self, game_state: GameState, player, dice_roll: tuple[int, int]) -> ChanceCard:
         if len(self.__shuffled_cards) == 0:
             self.__shuffle_cards()
 
@@ -37,7 +37,7 @@ class ChanceManager:
         card = self.chance_cards[card_id]
 
         args = card[3]
-        if dice_roll is not None and card_id == 9: # Move player to nearest utility
+        if dice_roll is not None and card_id in [6, 9, 11, 12, 13]: # Move player to nearest utility
             args = (*args, dice_roll)
 
         get_out_of_jail_card_id = 1
@@ -52,7 +52,7 @@ class ChanceManager:
                         description=f"{player} received a Get Out of Jail Free card"
                     )
             elif self.get_out_of_jail_card_owner is not None:
-                return self.draw_card(game_state, player)
+                return self.draw_card(game_state, player, dice_roll)
 
         # Register the card drawn event
         if self.event_manager:
@@ -341,8 +341,7 @@ class ChanceManager:
                     break
             
             # Get the rent amount
-            from utils.rent_calculator import calculate_rent
-            rent = calculate_rent(game_state, tile, owner)
+            rent = self.__calculate_rent(game_state, tile, owner)
             
             # Register rent payment event
             if self.event_manager and owner:
@@ -357,7 +356,7 @@ class ChanceManager:
                 
             game_state.pay_rent(player, tile)
 
-    def __move_player_to_property(self, game_state: GameState, player, property_name: str):
+    def __move_player_to_property(self, game_state: GameState, player, property_name: str, dice_roll: tuple[int, int]):
         property_tile = game_state.board.get_tile_by_name(property_name)
         if property_tile is None:
             custom_print(game_state.board.tiles)
@@ -386,8 +385,7 @@ class ChanceManager:
                     break
             
             # Get the rent amount
-            from utils.rent_calculator import calculate_rent
-            rent = calculate_rent(game_state, property_tile, owner)
+            rent = self.__calculate_rent(game_state, property_tile, owner, dice_roll)
             
             # Register rent payment event
             if self.event_manager and owner:
@@ -528,7 +526,7 @@ class ChanceManager:
             ),
             (
                 13,
-                "Avanseaza la B-dul Eroiloe. Daca treci pe START, colectezi 200$",
+                "Avanseaza la B-dul Eroilor. Daca treci pe START, colectezi 200$",
                 self.__move_player_to_property,
                 ("B-dul Eroilor",)
             ),
@@ -545,6 +543,38 @@ class ChanceManager:
                 (15,)
             )
         ]
+    
+
+    def __calculate_rent(self, game_state, property, owner, dice_roll: tuple[int, int] = None) -> int:
+        """Helper method to calculate rent for a property"""
+        
+        if isinstance(property, Property):
+            rent = property.base_rent
+            if game_state.houses[property.group][0] > 0:
+                rent = property.house_rent[game_state.houses[property.group][0] - 1]
+            elif game_state.hotels[property.group][0] > 0:
+                rent = property.hotel_rent
+            elif all(prop in game_state.properties[owner] for prop in game_state.board.get_properties_by_group(property.group)):
+                rent = property.full_group_rent
+                
+        elif isinstance(property, Railway):
+            rent_index = -1
+            for prop in game_state.properties[owner]:
+                if isinstance(prop, Railway):
+                    rent_index += 1
+            rent = property.rent[rent_index]
+
+        elif isinstance(property, Utility):
+            dice = sum(dice_roll)
+            rent = 4 * dice
+            for prop in game_state.properties[owner]:
+                if isinstance(prop, Utility) and prop != property:
+                    rent = 10 * dice
+                    
+        else:
+            rent = 0
+            
+        return rent
 
 
 if __name__ == "__main__":
