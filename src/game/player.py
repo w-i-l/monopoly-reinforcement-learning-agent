@@ -9,6 +9,10 @@ class Player:
     def __init__(self, name):
         self.name = name
 
+        self.event_queue = []
+        self.event_history = []
+        self.max_history = 100
+
     def __repr__(self):
         return f"{self.name}"
     
@@ -47,3 +51,41 @@ class Player:
     def get_trade_offers(self, game_state) -> List:
         # TODO: Implement the logic to suggest trade offers
         return []
+    
+    def on_event_received(self, event):
+        """
+        Called when an event relevant to this player occurs.
+        Each player type can override this to respond to events.
+        
+        Args:
+            event: The Event object containing event information
+        """
+        # Store event in history
+        self.event_history.append(event)
+        if len(self.event_history) > self.max_history:
+            self.event_history.pop(0)
+            
+        # Add to player's event queue
+        self.event_queue.append(event)
+        
+        # Basic implementation just logs the event
+        # print(f"[{self.name}] Event: {event.description}")
+    
+    def get_event(self):
+        """
+        Get the oldest event from this player's queue.
+        
+        Returns:
+            The oldest event or None if queue is empty
+        """
+        if not self.event_queue:
+            return None
+        return self.event_queue.pop(0)
+    
+    def has_events(self):
+        """Check if player has unprocessed events."""
+        return len(self.event_queue) > 0
+    
+    def clear_events(self):
+        """Clear all events from the player's queue."""
+        self.event_queue.clear()

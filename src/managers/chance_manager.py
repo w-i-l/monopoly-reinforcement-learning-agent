@@ -3,6 +3,11 @@ from models.chance_card import ChanceCard
 from random import shuffle
 from typing import List
 from exceptions.exceptions import NotEnoughJailCardsException
+from events.events import EventType
+from models.railway import Railway
+from models.utility import Utility
+from models.property import Property
+from models.tile import Tile
 
 CAN_PRINT = False
 def custom_print(*args, **kwargs):
@@ -14,12 +19,15 @@ class ChanceManager:
         self.chance_cards = self.__load_cards()
         self.__shuffle_cards()
         self.get_out_of_jail_card_owner = None
+        self.event_manager = None
 
+    def set_event_manager(self, event_manager):
+        """Set the event manager for this chance manager."""
+        self.event_manager = event_manager
 
     def __shuffle_cards(self):
         self.__shuffled_cards = list(range(len(self.chance_cards)))
         shuffle(self.__shuffled_cards)
-
 
     def draw_card(self, game_state: GameState, player, dice_roll: tuple[int, int] = None) -> ChanceCard:
         if len(self.__shuffled_cards) == 0:
@@ -36,9 +44,23 @@ class ChanceManager:
         if card_id == get_out_of_jail_card_id:
             if self.get_out_of_jail_card_owner == None:
                 self.get_out_of_jail_card_owner = player
-
+                # Register card receiving event
+                if self.event_manager:
+                    self.event_manager.register_event(
+                        EventType.GET_OUT_OF_JAIL_CARD_RECEIVED,
+                        player=player,
+                        description=f"{player} received a Get Out of Jail Free card"
+                    )
             elif self.get_out_of_jail_card_owner is not None:
                 return self.draw_card(game_state, player)
+
+        # Register the card drawn event
+        if self.event_manager:
+            self.event_manager.register_event(
+                EventType.CHANCE_CARD_DRAWN,
+                player=player,
+                description=f"{player} drew Chance card: {card[1]}"
+            )
 
         return ChanceCard(
             id=card[0],
@@ -46,21 +68,25 @@ class ChanceManager:
             action=card[2],
             args=(game_state, player, *args)
         )
-    
 
     def use_get_out_of_jail_card(self, player):
         if self.get_out_of_jail_card_owner is not None:
+            # Register card use event
+            if self.event_manager:
+                self.event_manager.register_event(
+                    EventType.GET_OUT_OF_JAIL_CARD_USED,
+                    player=player,
+                    description=f"{player} used a Get Out of Jail Free card"
+                )
             self.get_out_of_jail_card_owner = None
             get_out_of_jail_card_id = 1
             self.__shuffled_cards.append(get_out_of_jail_card_id)
             return
         
         raise NotEnoughJailCardsException(player_name=player.name)
-    
 
     def update_get_out_of_jail_card_owner(self, player):
         self.get_out_of_jail_card_owner = player
-
 
     def __move_player_to_nearest_utility(self, game_state: GameState, player, dice_roll: tuple[int, int]):
         utilities = game_state.board.get_utilities()
@@ -75,26 +101,73 @@ class ChanceManager:
                 min_distance = distance
                 nearest_utility = utility
 
+        # Register movement event
+        if self.event_manager:
+            self.event_manager.register_event(
+                EventType.PLAYER_MOVED,
+                player=player,
+                tile=nearest_utility,
+                description=f"{player} moved to nearest utility: {nearest_utility}"
+            )
+
         game_state.move_player_to_property(player, nearest_utility)
 
         # Pay rent or buy the utility
-        if utility in game_state.is_owned and \
-            not utility in game_state.properties[player] and\
-            not utility in game_state.mortgaged_properties:
+        if nearest_utility in game_state.is_owned and \
+            not nearest_utility in game_state.properties[player] and\
+            not nearest_utility in game_state.mortgaged_properties:
+            
+            # Find the owner
+            owner = None
+            for p in game_state.players:
+                if nearest_utility in game_state.properties[p]:
+                    owner = p
+                    break
+            
+            # Calculate rent
+            utility_rent = 10 * sum(dice_roll)
+            
+            # Register rent payment event
+            if self.event_manager and owner:
+                self.event_manager.register_event(
+                    EventType.RENT_PAID,
+                    player=player,
+                    target_player=owner,
+                    tile=nearest_utility,
+                    amount=utility_rent,
+                    dice=dice_roll,
+                    description=f"{player} paid ${utility_rent} rent to {owner} for {nearest_utility}"
+                )
+                
             game_state.pay_rent(
                 player,
-                utility,
+                nearest_utility,
                 dice_roll=dice_roll,
                 utility_factor_multiplier=10
                 )
         else:
-            if player.should_buy_property(game_state, utility):
-                game_state.buy_property(player, utility)
-
+            if player.should_buy_property(game_state, nearest_utility):
+                # Register purchase event
+                if self.event_manager:
+                    self.event_manager.register_event(
+                        EventType.PROPERTY_PURCHASED,
+                        player=player,
+                        tile=nearest_utility,
+                        amount=nearest_utility.price,
+                        description=f"{player} purchased {nearest_utility} for ${nearest_utility.price}"
+                    )
+                game_state.buy_property(player, nearest_utility)
 
     def __pay_tax(self, game_state: GameState, player, tax: int):
+        # Register tax payment event
+        if self.event_manager:
+            self.event_manager.register_event(
+                EventType.TAX_PAID,
+                player=player,
+                amount=tax,
+                description=f"{player} paid ${tax} in taxes"
+            )
         game_state.pay_tax(player, tax)
-
 
     def __pay_tax_for_buildings(self, game_state: GameState, player):
         tax = 0
@@ -115,17 +188,50 @@ class ChanceManager:
                 hotels_count += no_of_properties
 
         tax = houses_count * 25 + hotels_count * 100
+        
+        # Register building tax event
+        if self.event_manager:
+            self.event_manager.register_event(
+                EventType.TAX_PAID,
+                player=player,
+                amount=tax,
+                description=f"{player} paid ${tax} for building repairs (houses: {houses_count}, hotels: {hotels_count})"
+            )
+            
         game_state.pay_tax(player, tax)
-
 
     def __move_player_to_start(self, game_state: GameState, player):
         start_tile = game_state.board.get_tile_by_name("Start")
+        
+        # Register move to start event
+        if self.event_manager:
+            self.event_manager.register_event(
+                EventType.PLAYER_MOVED,
+                player=player,
+                tile=start_tile,
+                description=f"{player} moved to Start"
+            )
+            
+            # Register collection of $200 event
+            self.event_manager.register_event(
+                EventType.MONEY_RECEIVED,
+                player=player,
+                amount=200,
+                description=f"{player} collected $200 for reaching Start"
+            )
+            
         game_state.move_player_to_property(player, start_tile)
 
-    
     def __receive_income(self, game_state: GameState, player, amount: int):
+        # Register income event
+        if self.event_manager:
+            self.event_manager.register_event(
+                EventType.MONEY_RECEIVED,
+                player=player,
+                amount=amount,
+                description=f"{player} received ${amount}"
+            )
         game_state.receive_income(player, amount)
-
 
     def __move_player_to_nearest_railway(self, game_state: GameState, player, railway_factor_multiplier: int = None):
         railways = game_state.board.get_railways()
@@ -140,56 +246,205 @@ class ChanceManager:
                 min_distance = distance
                 nearest_railway = railway
 
+        # Register movement event
+        if self.event_manager:
+            self.event_manager.register_event(
+                EventType.PLAYER_MOVED,
+                player=player,
+                tile=nearest_railway,
+                description=f"{player} moved to nearest railway: {nearest_railway}"
+            )
+            
         game_state.move_player_to_property(player, nearest_railway)
 
         # Pay rent or buy the railway
-        if railway in game_state.is_owned and \
-            not railway in game_state.properties[player] and\
-            not railway in game_state.mortgaged_properties:
-            game_state.pay_rent(player, railway, railway_factor_multiplier)
-        else:
-            if player.should_buy_property(game_state, railway):
-                game_state.buy_property(player, railway)
+        if nearest_railway in game_state.is_owned and \
+            not nearest_railway in game_state.properties[player] and\
+            not nearest_railway in game_state.mortgaged_properties:
+            
+            # Find the owner
+            owner = None
+            for p in game_state.players:
+                if nearest_railway in game_state.properties[p]:
+                    owner = p
+                    break
+                    
+            # Get rent amount
+            rent_index = -1
+            for prop in game_state.properties[owner]:
+                if isinstance(prop, Railway):
+                    rent_index += 1
+            rent = nearest_railway.rent[rent_index]
+            if railway_factor_multiplier:
+                rent *= railway_factor_multiplier
                 
+            # Register rent payment event
+            if self.event_manager and owner:
+                self.event_manager.register_event(
+                    EventType.RENT_PAID,
+                    player=player,
+                    target_player=owner,
+                    tile=nearest_railway,
+                    amount=rent,
+                    description=f"{player} paid ${rent} rent to {owner} for {nearest_railway}"
+                )
+                
+            game_state.pay_rent(player, nearest_railway, railway_factor_multiplier)
+        else:
+            if player.should_buy_property(game_state, nearest_railway):
+                # Register purchase event
+                if self.event_manager:
+                    self.event_manager.register_event(
+                        EventType.PROPERTY_PURCHASED,
+                        player=player,
+                        tile=nearest_railway,
+                        amount=nearest_railway.price,
+                        description=f"{player} purchased {nearest_railway} for ${nearest_railway.price}"
+                    )
+                game_state.buy_property(player, nearest_railway)
 
     def __move_player_to_jail(self, game_state: GameState, player):
+        # Register jail event
+        if self.event_manager:
+            self.event_manager.register_event(
+                EventType.PLAYER_WENT_TO_JAIL,
+                player=player,
+                description=f"{player} was sent to jail"
+            )
         game_state.sent_player_to_jail(player)
 
-    
     def __move_player_backwards(self, game_state: GameState, player, steps: int):
+        old_position = game_state.player_positions[player]
         game_state.move_player_backwards(player, steps)
+        new_position = game_state.player_positions[player]
+        
+        # Register movement event
+        if self.event_manager:
+            self.event_manager.register_event(
+                EventType.PLAYER_MOVED,
+                player=player,
+                tile=game_state.board.tiles[new_position],
+                description=f"{player} moved backwards {steps} steps to {game_state.board.tiles[new_position]}"
+            )
 
         current_player_position = game_state.player_positions[player]
         tile = game_state.board.tiles[current_player_position]
         if tile in game_state.is_owned and \
             not tile in game_state.properties[player] and\
             not tile in game_state.mortgaged_properties:
+            
+            # Find the owner
+            owner = None
+            for p in game_state.players:
+                if tile in game_state.properties[p]:
+                    owner = p
+                    break
+            
+            # Get the rent amount
+            from utils.rent_calculator import calculate_rent
+            rent = calculate_rent(game_state, tile, owner)
+            
+            # Register rent payment event
+            if self.event_manager and owner:
+                self.event_manager.register_event(
+                    EventType.RENT_PAID,
+                    player=player,
+                    target_player=owner,
+                    tile=tile,
+                    amount=rent,
+                    description=f"{player} paid ${rent} rent to {owner} for {tile}"
+                )
+                
             game_state.pay_rent(player, tile)
-
 
     def __move_player_to_property(self, game_state: GameState, player, property_name: str):
         property_tile = game_state.board.get_tile_by_name(property_name)
         if property_tile is None:
             custom_print(game_state.board.tiles)
             exit(0)
+            
+        # Register movement event
+        if self.event_manager:
+            self.event_manager.register_event(
+                EventType.PLAYER_MOVED,
+                player=player,
+                tile=property_tile,
+                description=f"{player} moved to {property_tile}"
+            )
+            
         game_state.move_player_to_property(player, property_tile)
 
         if property_tile in game_state.is_owned and \
             not property_tile in game_state.properties[player] and\
             not property_tile in game_state.mortgaged_properties:
+            
+            # Find the owner
+            owner = None
+            for p in game_state.players:
+                if property_tile in game_state.properties[p]:
+                    owner = p
+                    break
+            
+            # Get the rent amount
+            from utils.rent_calculator import calculate_rent
+            rent = calculate_rent(game_state, property_tile, owner)
+            
+            # Register rent payment event
+            if self.event_manager and owner:
+                self.event_manager.register_event(
+                    EventType.RENT_PAID,
+                    player=player,
+                    target_player=owner,
+                    tile=property_tile,
+                    amount=rent,
+                    description=f"{player} paid ${rent} rent to {owner} for {property_tile}"
+                )
+            
             game_state.pay_rent(player, property_tile)
         else:
             if player.should_buy_property(game_state, property_tile):
+                # Register purchase event
+                if self.event_manager:
+                    self.event_manager.register_event(
+                        EventType.PROPERTY_PURCHASED,
+                        player=player,
+                        tile=property_tile,
+                        amount=property_tile.price,
+                        description=f"{player} purchased {property_tile} for ${property_tile.price}"
+                    )
                 game_state.buy_property(player, property_tile)
 
-
     def __receive_get_out_of_jail_card(self, game_state: GameState, player):
+        # Register jail card event
+        if self.event_manager:
+            self.event_manager.register_event(
+                EventType.GET_OUT_OF_JAIL_CARD_RECEIVED,
+                player=player,
+                description=f"{player} received a Get Out of Jail Free card"
+            )
         game_state.receive_get_out_of_jail_card(player)
         
-    
     def __pay_players(self, game_state: GameState, player, amount: int):
+        # Register payment events
+        if self.event_manager:
+            for other_player in game_state.players:
+                if other_player != player:
+                    self.event_manager.register_event(
+                        EventType.MONEY_PAID,
+                        player=player,
+                        target_player=other_player,
+                        amount=amount,
+                        description=f"{player} paid ${amount} to {other_player}"
+                    )
+                    
+                    self.event_manager.register_event(
+                        EventType.MONEY_RECEIVED,
+                        player=other_player,
+                        target_player=player,
+                        amount=amount,
+                        description=f"{other_player} received ${amount} from {player}"
+                    )
         game_state.pay_players(player, amount)
-
 
     def __load_cards(self) -> List[ChanceCard]:
         return [
