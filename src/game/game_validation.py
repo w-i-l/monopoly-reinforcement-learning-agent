@@ -101,9 +101,9 @@ class GameValidation:
         if not all(property in game_state.properties[player] for property in grouped_properties):
             return IncompletePropertyGroupException(str(property_group))
         
-        for number_of_houses in game_state.houses[property_group]:
-            if number_of_houses < 4:
-                return InsufficientHousesException(str(property_group), number_of_houses, 4)
+        number_of_houses, _ = game_state.houses[property_group]
+        if number_of_houses < 4:
+            return InsufficientHousesException(str(property_group), number_of_houses, 4)
         
         cost = property_group.hotel_cost()
         if game_state.player_balances[player] < cost:
