@@ -430,12 +430,16 @@ class GameManager:
         # Check if the player wants to upgrade properties
         self.__handle_upgrading_suggestions(current_player)
         
-        # Register turn ended event
-        self.event_manager.register_event(
-            EventType.TURN_ENDED,
-            player=current_player,
-            description=f"{current_player}'s turn ended"
-        )
+        # continue playing on doubles
+        if dice_roll[0] == dice_roll[1]:
+            self.play_turn()
+        else:
+            # Register turn ended event
+            self.event_manager.register_event(
+                EventType.TURN_ENDED,
+                player=current_player,
+                description=f"{current_player}'s turn ended"
+            )
             
 
     def __handle_downgrading_suggestions(self, current_player):
