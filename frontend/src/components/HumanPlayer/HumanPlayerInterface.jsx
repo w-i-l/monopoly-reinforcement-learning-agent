@@ -1,3 +1,5 @@
+// This would be an update to components/HumanPlayer/HumanPlayerInterface.jsx
+
 import React, { useState, useEffect } from "react";
 import Alert from "../UI/Alert";
 import { AlertDescription } from "../UI/Alert";
@@ -6,11 +8,13 @@ import useGameState from "../../hooks/useGameState";
 import PlayerCard from "../Cards/PlayerCard";
 import MonopolyBoard from "../Board/MonopolyBoard";
 import { TradeOfferModal, CreateTradeModal } from "../Modals/TradeOfferModal";
+import EventFeed from "../EventFeed/EventFeed";
 
 const HumanPlayerInterface = ({ playerPort = 6060 }) => {
   const [pendingDecision, setPendingDecision] = useState(null);
   const [error, setError] = useState(null);
   const [selectedItems, setSelectedItems] = useState(new Set());
+  const [showEventFeed, setShowEventFeed] = useState(true);
   const {
     gameState,
     lastRoll,
@@ -307,15 +311,31 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
 
         <div className="w-1/3 space-y-4">
           {renderDecisionUI()}
-          <div className="mb-4">
+          
+          <div className="mb-4 flex justify-between">
             <Button
               onClick={() => handleDecision({ type: "create_trade" })}
-              className="w-full"
+              className="flex-1 mr-2"
               disabled={!currentPlayer || pendingDecision}
             >
               Propose Trade
             </Button>
+            
+            <Button
+              onClick={() => setShowEventFeed(!showEventFeed)}
+              className="px-3"
+            >
+              {showEventFeed ? "Hide Events" : "Show Events"}
+            </Button>
           </div>
+          
+          {/* Event Feed toggle */}
+          {showEventFeed && (
+            <div className="mb-4">
+              <EventFeed playerPort={playerPort} />
+            </div>
+          )}
+          
           {renderPlayerCards()}
         </div>
       </div>

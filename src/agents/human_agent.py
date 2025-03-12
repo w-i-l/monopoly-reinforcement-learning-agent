@@ -23,6 +23,7 @@ from models.utility import Utility
 from copy import deepcopy
 from models.trade_offer import TradeOffer
 from typing import Optional
+from datetime import datetime as Date
 
 class HumanAgent(Player):
     def __init__(self, name, port=6060, frontend_port=5173):
@@ -33,6 +34,9 @@ class HumanAgent(Player):
 
         self.decision_queue = queue.Queue()
         self.response_queue = queue.Queue()
+
+        self.ui_event_queue = queue.Queue(maxsize=100)  # Cap at 100 events
+
         self.server = self._setup_server()
 
         self._start_server()
@@ -98,6 +102,19 @@ class HumanAgent(Player):
             except Exception as e:
                 ErrorLogger.log_error(e)
                 raise HTTPException(status_code=500, detail=str(e))
+            
+        @app.get("/api/events")
+        async def get_events():
+            events = []
+            try:
+                # Get all events from queue without blocking
+                while not self.ui_event_queue.empty():
+                    events.append(self.ui_event_queue.get_nowait())
+                return {"events": events}
+            except Exception as e:
+                from utils.logger import ErrorLogger
+                ErrorLogger.log_error(e)
+                return {"events": []}
 
         return app
     
@@ -432,6 +449,8 @@ class HumanAgent(Player):
             }
             
             suggestions = self._wait_for_decision("unmortgage_properties", data)
+            if not suggestions:
+                return []
             return [
                 next(p for p in properties if str(p) == prop_str)
                 for prop_str in suggestions
@@ -567,3 +586,37 @@ class HumanAgent(Player):
         except Exception as e:
             ErrorLogger.log_error(e)
             return None
+        
+
+    def on_event_received(self, event):
+        """
+        Handle events by storing them and forwarding to the UI.
+        
+        Args:
+            event: The Event object
+        """
+        # Call the parent implementation to log and store in history
+        super().on_event_received(event)
+        
+        # Convert event to a UI-friendly format, regardless of which player triggered it
+        ui_event = {
+            "type": event.type.name,
+            "description": event.description,
+            "player": str(event.player),
+            "target_player": str(event.target_player) if event.target_player else None,
+            "tile": str(event.tile) if event.tile else None,
+            "amount": event.amount,
+            "timestamp": Date.now().isoformat(),  # Add a timestamp for sorting in ISO format
+            "is_opponent": event.player != self  # Flag to indicate if it's an opponent's event
+        }
+        
+        # Queue the event to be sent to the UI
+        try:
+            self.ui_event_queue.put_nowait(ui_event)
+        except queue.Full:
+            # Queue is full, remove oldest event and add new one
+            try:
+                self.ui_event_queue.get_nowait()
+                self.ui_event_queue.put_nowait(ui_event)
+            except:
+                pass
