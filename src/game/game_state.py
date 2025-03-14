@@ -435,6 +435,25 @@ class GameState:
             for property in properties
             if property.group in groups_with_hotels
         }
+    
+
+    def get_player_net_worth(self, player: Player) -> int:
+        net_worth = self.player_balances[player]
+
+        # adding property values - mortgage values
+        for property in self.properties[player]:
+            if property in self.mortgaged_properties:
+                net_worth += property.mortgage
+            else:
+                net_worth += property.price
+
+        # adding houses and hotels values
+        for group in PropertyGroup:
+            number_of_properties = len(self.board.get_properties_by_group(group))
+            net_worth += self.houses[group][0] * group.house_cost() * number_of_properties
+            net_worth += self.hotels[group][0] * group.hotel_cost() * number_of_properties
+
+        return net_worth
 
 
 if __name__ == "__main__":
