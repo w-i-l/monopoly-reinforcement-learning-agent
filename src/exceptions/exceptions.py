@@ -157,9 +157,19 @@ class NotEnoughJailCardsException(GameException):
         self.message = f"Player {player_name} has only {jail_cards} jail cards"
         super().__init__(self.message)
 
+class NoSourcePlayerException(GameException):
+    def __init__(self):
+        self.message = "Trade must have a source player"
+        super().__init__(self.message)
+
 class NoTargetPlayerException(GameException):
     def __init__(self):
         self.message = "Trade must have a target player"
+        super().__init__(self.message)
+
+class SameSourceAndTargetPlayerException(GameException):
+    def __init__(self):
+        self.message = "Source and target player cannot be the same"
         super().__init__(self.message)
 
 class NoAssetIsBeingTradedException(GameException):
@@ -185,4 +195,19 @@ class InvalidJailCardOfferedException(GameException):
 class InvalidJailCardRequestedException(GameException):
     def __init__(self, player_name: str, jail_cards: int):
         self.message = f"Player `{player_name}` cannot request `{jail_cards}` jail cards"
+        super().__init__(self.message)
+
+class ExcedingMoneyInTraddingOfferException(GameException):
+    def __init__(self, player_name: str, money: int):
+        self.message = f"Player `{player_name}` cannot offer `{money}` money"
+        super().__init__(self.message)
+
+class InvalidAmountOfJailCardsException(GameException):
+    def __init__(self, player_name: str):
+        self.message = f"Player `{player_name}` cannot hold more than 2 jail cards"
+        super().__init__(self.message)
+
+class PlayerAlreadyInJailException(GameException):
+    def __init__(self, player_name: str):
+        self.message = f"Player `{player_name}` is already in jail"
         super().__init__(self.message)

@@ -114,7 +114,7 @@ class GameValidation:
 
     @staticmethod
     def validate_sell_house(game_state: GameState, player: Player, property_group: PropertyGroup) -> Optional[GameException]:
-        if game_state.houses[property_group][0] == 0:
+        if game_state.houses[property_group][0] <= 0:
             return NoHousesToSellException(str(property_group))
         
         grouped_properties = game_state.board.get_properties_by_group(property_group)
@@ -130,7 +130,7 @@ class GameValidation:
 
     @staticmethod
     def validate_sell_hotel(game_state: GameState, player: Player, property_group: PropertyGroup) -> Optional[GameException]:
-        if game_state.hotels[property_group][0] == 0:
+        if game_state.hotels[property_group][0] <= 0:
             return NoHotelToSellException(str(property_group))
         
         grouped_properties = game_state.board.get_properties_by_group(property_group)
@@ -142,6 +142,29 @@ class GameValidation:
             return NotImprovementOwnerException("hotel", str(property_group), str(player))
         
         return None
+    
+
+    @staticmethod
+    def validate_send_player_to_jail(game_state: GameState, player: Player) -> Optional[GameException]:
+        if game_state.in_jail[player]:
+            return PlayerAlreadyInJailException(str(player))
+        
+        return None
+
+    @staticmethod
+    def validate_count_turn_in_jail(game_state: GameState, player: Player) -> Optional[GameException]:
+        if not game_state.in_jail[player]:
+            return NotInJailException(str(player))
+        
+        return None
+    
+
+    @staticmethod
+    def validate_receive_get_out_of_jail_card(game_state: GameState, player: Player) -> Optional[GameException]:
+        if game_state.escape_jail_cards[player] >= 2:
+            return InvalidAmountOfJailCardsException(str(player))
+        
+        return
     
 
     @staticmethod
@@ -178,6 +201,27 @@ class GameValidation:
     def validate_pay_tax(game_state: GameState, player: Player, tax: int) -> Optional[GameException]:
         if game_state.player_balances[player] < tax:
             return NotEnoughBalanceException(tax, game_state.player_balances[player])
+        
+        return None
+    
+
+    @staticmethod
+    def validate_receive_from_players(game_state: GameState, receiver_player: Player, amount: int) -> Optional[GameException]:
+        for player in game_state.players:
+            if player == receiver_player:
+                continue
+            
+            if game_state.player_balances[player] < amount:
+                return NotEnoughBalanceException(amount, game_state.player_balances[player])
+            
+        return None
+    
+
+    @staticmethod
+    def validate_pay_players(game_state: GameState, player: Player, amount: int) -> Optional[GameException]:
+        receivers_count = game_state.players_count - 1
+        if game_state.player_balances[player] < amount * receivers_count:
+            return NotEnoughBalanceException(amount * receivers_count, game_state.player_balances[player])
         
         return None
 
@@ -253,8 +297,17 @@ class GameValidation:
         if trade_offer.source_player not in game_state.players:
             return PlayerDoesNotExistException(str(trade_offer.source_player))
         
+        if trade_offer.target_player not in game_state.players:
+            return PlayerDoesNotExistException(str(trade_offer.target_player))
+        
         if not trade_offer.target_player:
             return NoTargetPlayerException()
+        
+        if not trade_offer.source_player:
+            return NoSourcePlayerException()
+        
+        if trade_offer.source_player == trade_offer.target_player:
+            return SameSourceAndTargetPlayerException()
                 
         if trade_offer.properties_offered and len(trade_offer.properties_offered) > 0:
             for property in trade_offer.properties_offered:
@@ -314,10 +367,16 @@ class GameValidation:
         if trade_offer.money_offered:
             if trade_offer.money_offered < 0:
                 return NegativeMoneyOfferedException(trade_offer.money_offered)
+            
+            if trade_offer.money_offered > game_state.player_balances[trade_offer.source_player]:
+                return ExcedingMoneyInTraddingOfferException(str(trade_offer.source_player), trade_offer.money_offered)
         
         if trade_offer.money_requested:
             if trade_offer.money_requested < 0:
                 return NegativeMoneyRequestedException(trade_offer.money_requested)
+            
+            if trade_offer.money_requested > game_state.player_balances[trade_offer.target_player]:
+                return ExcedingMoneyInTraddingOfferException(str(trade_offer.target_player), trade_offer.money_requested)
         
                     
         return None
