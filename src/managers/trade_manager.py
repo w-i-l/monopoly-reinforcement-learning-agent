@@ -21,29 +21,10 @@ class TradeManager:
         self.active_trades = []
         self.event_manager = None
         
+
     def set_event_manager(self, event_manager):
-        """Set the event manager for this trade manager."""
         self.event_manager = event_manager
 
-    def make_trade(self, trade_offer: TradeOffer):
-        """Add a trade offer to the active trades list."""
-        self.active_trades.append(trade_offer)
-        
-        # Register trade offered event
-        if self.event_manager:
-            self.event_manager.register_event(
-                EventType.TRADE_OFFERED,
-                player=trade_offer.source_player,
-                target_player=trade_offer.target_player,
-                additional_data={"trade_offer": trade_offer},
-                description=f"{trade_offer.source_player} offered a trade to {trade_offer.target_player}"
-            )
-
-    def execute_all_active_trades(self, game_state: GameState, chance_manager: ChanceManager, community_chest_manager: CommunityChestManager):
-        """Execute all active trade offers."""
-        for trade in self.active_trades:
-            self.execute_trade(trade, game_state, chance_manager, community_chest_manager)
-        self.active_trades = []
 
     def execute_trade(
             self, 
@@ -56,15 +37,6 @@ class TradeManager:
 
         # Check if the trade is valid
         if error := GameValidation.validate_trade_offer(game_state, trade_offer):
-            # Register trade rejected due to validation error
-            if self.event_manager:
-                self.event_manager.register_event(
-                    EventType.TRADE_REJECTED,
-                    player=trade_offer.source_player,
-                    target_player=trade_offer.target_player,
-                    additional_data={"trade_offer": trade_offer, "error": str(error)},
-                    description=f"Trade rejected: {error}"
-                )
             raise error
         
         # Check if the players want to trade
