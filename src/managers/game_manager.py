@@ -243,10 +243,10 @@ class GameManager:
 
         
         current_position = self.game_state.player_positions[current_player]
-        tile = self.game_state.board.tiles[current_position]
+        current_tile = self.game_state.board.tiles[current_position]
 
         # check if the player went to jail
-        if isinstance(tile, Jail) and self.game_state.in_jail[current_player]:
+        if isinstance(current_tile, Jail) and self.game_state.in_jail[current_player]:
             self.event_manager.register_event(
                 EventType.PLAYER_WENT_TO_JAIL,
                 player=current_player,
@@ -260,36 +260,13 @@ class GameManager:
             )
             return
 
-        # Check if player landed on a Tax tile
-        if isinstance(tile, Taxes):
-            try: 
-                self.game_state.pay_tax(current_player, tile.tax)
-                self.event_manager.register_event(
-                    EventType.TAX_PAID,
-                    player=current_player,
-                    amount=tile.tax,
-                    description=f"{current_player} paid ${tile.tax} in taxes"
-                )
-            except NotEnoughBalanceException:
-                self.event_manager.register_event(
-                    EventType.PLAYER_BANKRUPT,
-                    player=current_player,
-                    amount=self.game_state.player_balances[current_player]
-                )
-                custom_print(f"{current_player} is bankrupt")
-                custom_print("GAME OVER")
-                return -1
-            except Exception as e:
-                ErrorLogger.log_error(e)
-                raise e
-
         
         # Handle landing on chance/community chest
-        if isinstance(tile, Chance):
+        if isinstance(current_tile, Chance):
             self.event_manager.register_event(
                 EventType.CHANCE_CARD_DRAWN,
                 player=current_player,
-                tile=tile,
+                tile=current_tile,
                 description=f"{current_player} landed on Chance"
             )
             
@@ -297,9 +274,13 @@ class GameManager:
             chance_card = self.chance_manager.draw_card(self.game_state, current_player, dice_roll)
             try:
                 custom_print("Performing chance card action", chance_card)
-                
                 # Execute the card action
                 chance_card.action(*chance_card.args)
+
+                # updating the player position after the card action
+                current_position = self.game_state.player_positions[current_player]
+                current_tile = self.game_state.board.tiles[current_position]
+
             except NotEnoughBalanceException:
                 self.event_manager.register_event(
                     EventType.PLAYER_BANKRUPT,
@@ -309,16 +290,19 @@ class GameManager:
                 custom_print(f"{current_player} is bankrupt")
                 custom_print("GAME OVER")
                 return -1
+            
             except Exception as e:
                 ErrorLogger.log_error(e)
                 custom_print("Error in chance card action")
                 raise e
 
-        elif isinstance(tile, CommunityChest):
+        # `if` instead of `elif` because player can move backwards
+        # and land on a community chest tile after landing on a chance tile
+        if isinstance(current_tile, CommunityChest):
             self.event_manager.register_event(
                 EventType.COMMUNITY_CHEST_CARD_DRAWN,
                 player=current_player,
-                tile=tile,
+                tile=current_tile,
                 description=f"{current_player} landed on Community Chest"
             )
             
@@ -328,6 +312,10 @@ class GameManager:
                 
                 # Execute the card action
                 community_chest_card.action(*community_chest_card.args)
+
+                # updating the player position after the card action
+                current_position = self.game_state.player_positions[current_player]
+                current_tile = self.game_state.board.tiles[current_position]
 
             except NotEnoughBalanceException:
                 self.event_manager.register_event(
@@ -342,38 +330,63 @@ class GameManager:
                 ErrorLogger.log_error(e)
                 custom_print("Error in community chest card action")
                 raise e
+            
+        # Check if player landed on a Tax tile
+        # needs to be after community chest and chance
+        # because player can land on a tax tile from those
+        if isinstance(current_tile, Taxes):
+            try: 
+                self.game_state.pay_tax(current_player, current_tile.tax)
+                self.event_manager.register_event(
+                    EventType.TAX_PAID,
+                    player=current_player,
+                    amount=current_tile.tax,
+                    description=f"{current_player} paid ${current_tile.tax} in taxes"
+                )
+            except NotEnoughBalanceException:
+                self.event_manager.register_event(
+                    EventType.PLAYER_BANKRUPT,
+                    player=current_player,
+                    amount=self.game_state.player_balances[current_player]
+                )
+                custom_print(f"{current_player} is bankrupt")
+                custom_print("GAME OVER")
+                return -1
+            except Exception as e:
+                ErrorLogger.log_error(e)
+                raise e
         
         # Check if the player landed on an owned property
-        custom_print(tile)
+        custom_print(current_tile)
         custom_print(self.game_state.is_owned)
-        if tile in self.game_state.is_owned and\
-           tile not in self.game_state.properties[current_player] and\
-           tile not in self.game_state.mortgaged_properties:
+        if current_tile in self.game_state.is_owned and\
+           current_tile not in self.game_state.properties[current_player] and\
+           current_tile not in self.game_state.mortgaged_properties:
             try:
                 dice_roll = self.dice_manager.roll()
                 
                 # Find the owner of the property
                 owner = None
                 for player in self.players:
-                    if tile in self.game_state.properties[player]:
+                    if current_tile in self.game_state.properties[player]:
                         owner = player
                         break
                 
                 # Calculate rent before paying it
-                rent_amount = self.__calculate_rent(tile, owner, dice_roll)
+                rent_amount = self.__calculate_rent(current_tile, owner, dice_roll)
                 
                 # Register rent event
                 self.event_manager.register_event(
                     EventType.RENT_PAID,
                     player=current_player,
                     target_player=owner,
-                    tile=tile,
+                    tile=current_tile,
                     amount=rent_amount,
-                    description=f"{current_player} paid ${rent_amount} rent to {owner} for {tile}"
+                    description=f"{current_player} paid ${rent_amount} rent to {owner} for {current_tile}"
                 )
                 
                 # Process the rent payment
-                self.game_state.pay_rent(current_player, tile, dice_roll)
+                self.game_state.pay_rent(current_player, current_tile, dice_roll)
             
             except NotEnoughBalanceException:
                 self.event_manager.register_event(
@@ -390,28 +403,28 @@ class GameManager:
                 raise e
 
         # Check if the player landed on an unowned property
-        elif tile not in self.game_state.is_owned:
-            if current_player.should_buy_property(self.game_state, tile):
+        elif current_tile not in self.game_state.is_owned:
+            if current_player.should_buy_property(self.game_state, current_tile):
                 try:
                     # Register property purchase event
-                    price = getattr(tile, 'price', 0)
+                    price = getattr(current_tile, 'price', 0)
                     self.event_manager.register_event(
                         EventType.PROPERTY_PURCHASED,
                         player=current_player,
-                        tile=tile,
+                        tile=current_tile,
                         amount=price,
-                        description=f"{current_player} purchased {tile} for ${price}"
+                        description=f"{current_player} purchased {current_tile} for ${price}"
                     )
                     
                     # Process the purchase
-                    self.game_state.buy_property(current_player, tile)
+                    self.game_state.buy_property(current_player, current_tile)
                 
                 except NotEnoughBalanceException:
                     self.event_manager.register_event(
                         EventType.MONEY_PAID,
                         player=current_player,
                         amount=price,
-                        description=f"{current_player} was unable to buy {tile} due to insufficient funds"
+                        description=f"{current_player} was unable to buy {current_tile} due to insufficient funds"
                     )
                     custom_print(f"{current_player} is bankrupt")
                     custom_print("GAME OVER")
@@ -425,8 +438,8 @@ class GameManager:
                 self.event_manager.register_event(
                     EventType.AUCTION_STARTED,
                     player=current_player,
-                    tile=tile,
-                    description=f"{current_player} chose not to purchase {tile}, starting auction"
+                    tile=current_tile,
+                    description=f"{current_player} chose not to purchase {current_tile}, starting auction"
                 )
                 # Placeholder for auction implementation
                 pass
