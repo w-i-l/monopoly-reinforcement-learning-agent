@@ -17,13 +17,16 @@ class CommunityChestManager:
         self.get_out_of_jail_card_owner = None
         self.event_manager = None
 
+
     def set_event_manager(self, event_manager):
         """Set the event manager for this community chest manager."""
         self.event_manager = event_manager
 
+
     def __shuffle_cards(self):
         self.__shuffled_cards = list(range(len(self.community_chest_cards)))
         shuffle(self.__shuffled_cards)
+
 
     def draw_card(self, game_state: GameState, player) -> CommunityChestCard:
         if len(self.__shuffled_cards) == 0:
@@ -43,6 +46,7 @@ class CommunityChestManager:
                         player=player,
                         description=f"{player} received a Get Out of Jail Free card"
                     )
+
             elif self.get_out_of_jail_card_owner is not None:
                 return self.draw_card(game_state, player)
 
@@ -61,6 +65,7 @@ class CommunityChestManager:
             args=(game_state, player, *card[3])
         )
 
+
     def use_get_out_of_jail_card(self, player):
         if self.get_out_of_jail_card_owner is not None:
             # Register card use event
@@ -77,8 +82,10 @@ class CommunityChestManager:
         
         raise NoJailFreeCardCommunityChestException(player_name=player.name)
 
+
     def update_get_out_of_jail_card_owner(self, player): 
         self.get_out_of_jail_card_owner = player
+
 
     def __move_player_to_start(self, game_state: GameState, player):
         start_tile = game_state.board.get_tile_by_name("Start")
@@ -100,7 +107,8 @@ class CommunityChestManager:
                 description=f"{player} collected $200 for reaching Start"
             )
             
-        game_state.move_player_to_property(player, start_tile)
+        game_state.move_player_to_start(player)
+
 
     def __receive_income(self, game_state: GameState, player, amount: int):
         # Register income event
@@ -113,6 +121,7 @@ class CommunityChestManager:
             )
         game_state.receive_income(player, amount)
 
+
     def __pay_tax(self, game_state: GameState, player, tax: int):
         # Register tax payment event
         if self.event_manager:
@@ -123,6 +132,7 @@ class CommunityChestManager:
                 description=f"{player} paid ${tax} in taxes"
             )
         game_state.pay_tax(player, tax)
+
 
     def __pay_tax_for_buildings(self, game_state: GameState, player):
         tax = 0
@@ -155,6 +165,7 @@ class CommunityChestManager:
             
         game_state.pay_tax(player, tax)
 
+
     def __move_player_to_jail(self, game_state: GameState, player):
         # Register jail event
         if self.event_manager:
@@ -165,6 +176,7 @@ class CommunityChestManager:
             )
         game_state.send_player_to_jail(player)
 
+
     def __receive_get_out_of_jail_card(self, game_state: GameState, player):
         # Register jail card event
         if self.event_manager:
@@ -174,6 +186,7 @@ class CommunityChestManager:
                 description=f"{player} received a Get Out of Jail Free card"
             )
         game_state.receive_get_out_of_jail_card(player)
+
 
     def __receive_from_players(self, game_state: GameState, player, amount: int):
         # Register payment events
@@ -196,6 +209,7 @@ class CommunityChestManager:
                         description=f"{player} received ${amount} from {other_player}"
                     )
         game_state.receive_from_players(player, amount)
+
 
     def __load_cards(self) -> List[CommunityChestCard]:
         return [
@@ -298,8 +312,6 @@ class CommunityChestManager:
         ]
     
         
-
-
 if __name__ == "__main__":
     from game.player import Player
     from models.property_group import PropertyGroup
