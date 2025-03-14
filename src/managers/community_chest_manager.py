@@ -163,7 +163,7 @@ class CommunityChestManager:
                 player=player,
                 description=f"{player} was sent to jail"
             )
-        game_state.sent_player_to_jail(player)
+        game_state.send_player_to_jail(player)
 
     def __receive_get_out_of_jail_card(self, game_state: GameState, player):
         # Register jail card event
