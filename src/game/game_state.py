@@ -111,6 +111,12 @@ class GameState:
 
         self.player_positions[player] = property_position
 
+    
+    def move_player_to_start(self, player: Player):
+        self.player_positions[player] = 0
+        self.player_balances[player] += 200
+        custom_print(f"{player} moved to Start")
+
 
     ############## PROPERTY ACTIONS ##############
 

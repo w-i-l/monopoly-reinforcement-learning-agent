@@ -2,7 +2,7 @@ from game.game_state import GameState
 from models.chance_card import ChanceCard
 from random import shuffle
 from typing import List
-from exceptions.exceptions import NotEnoughJailCardsException
+from exceptions.exceptions import *
 from events.events import EventType
 from models.railway import Railway
 from models.utility import Utility
@@ -40,7 +40,7 @@ class ChanceManager:
         card = self.chance_cards[card_id]
 
         args = card[3]
-        if dice_roll is not None and card_id in [6, 9, 11, 12, 13]: # Move player to nearest utility
+        if dice_roll is not None and card_id in [6, 9, 11, 12, 13]: # Events that require dice roll
             args = (*args, dice_roll)
 
         get_out_of_jail_card_id = 1
@@ -84,6 +84,8 @@ class ChanceManager:
                 )
             self.get_out_of_jail_card_owner = None
             get_out_of_jail_card_id = 1
+
+            # Add the card back to the bottom of the deck
             self.__shuffled_cards.append(get_out_of_jail_card_id)
             return
         
@@ -102,7 +104,7 @@ class ChanceManager:
         nearest_utility = None
         min_distance = 100
         for utility in utilities:
-            distance = abs(utility.id - player_position)
+            distance = (utility.id - player_position) + (40 if utility.id < player_position else 0)
             if distance < min_distance:
                 min_distance = distance
                 nearest_utility = utility
@@ -229,7 +231,7 @@ class ChanceManager:
                 description=f"{player} collected $200 for reaching Start"
             )
             
-        game_state.move_player_to_property(player, start_tile)
+        game_state.move_player_to_start(player)
 
 
     def __receive_income(self, game_state: GameState, player, amount: int):
@@ -239,7 +241,7 @@ class ChanceManager:
                 EventType.MONEY_RECEIVED,
                 player=player,
                 amount=amount,
-                description=f"{player} received ${amount}"
+                description=f"{player} received ${amount} from chance card"
             )
         game_state.receive_income(player, amount)
 
@@ -252,7 +254,7 @@ class ChanceManager:
         nearest_railway = None
         min_distance = 100
         for railway in railways:
-            distance = abs(railway.id - player_position)
+            distance = (railway.id - player_position) + (40 if railway.id < player_position else 0)
             if distance < min_distance:
                 min_distance = distance
                 nearest_railway = railway
@@ -301,6 +303,7 @@ class ChanceManager:
                 )
                 
             game_state.pay_rent(player, nearest_railway, railway_factor_multiplier)
+
         else:
             if player.should_buy_property(game_state, nearest_railway):
                 # Register purchase event
@@ -395,8 +398,7 @@ class ChanceManager:
     def __move_player_to_property(self, game_state: GameState, player, property_name: str, dice_roll: tuple[int, int]):
         property_tile = game_state.board.get_tile_by_name(property_name)
         if property_tile is None:
-            custom_print(game_state.board.tiles)
-            exit(0)
+            raise NoPropertyNamedException(property_name)
             
         # Register movement event
         if self.event_manager:
@@ -435,6 +437,7 @@ class ChanceManager:
                 )
             
             game_state.pay_rent(player, property_tile)
+
         else:
             if player.should_buy_property(game_state, property_tile):
                 # Register purchase event

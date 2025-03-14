@@ -211,3 +211,8 @@ class PlayerAlreadyInJailException(GameException):
     def __init__(self, player_name: str):
         self.message = f"Player `{player_name}` is already in jail"
         super().__init__(self.message)
+
+class NoPropertyNamedException(GameException):
+    def __init__(self, property_name: str):
+        self.message = f"No property named `{property_name}`"
+        super().__init__(self.message)
