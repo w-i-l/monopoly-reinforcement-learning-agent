@@ -9,11 +9,13 @@ from models.other_tiles import Chance, CommunityChest
 from utils.logger import ErrorLogger
 from managers.trade_manager import TradeManager
 from managers.event_manager import EventManager, EventType, Event
+from models.tile import Tile
 from models.property import Property
 from models.railway import Railway
 from models.utility import Utility
 from models.property_group import PropertyGroup
 from models.other_tiles import Taxes, Jail
+from typing import Optional, Dict, Any, Tuple
 
 CAN_PRINT = False
 def custom_print(*args):
@@ -45,6 +47,7 @@ class GameManager:
             description="Monopoly game has started"
         )
 
+
     def play_turn(self):
         current_player_index = self.game_state.current_player_index
         current_player = self.players[current_player_index]
@@ -56,212 +59,59 @@ class GameManager:
         )
 
         # Check for bankruptcy
+        # TODO: Handle each player individually, rather than ending the game
         if self.game_state.player_balances[current_player] < 0:
-            self.event_manager.register_event(
-                EventType.PLAYER_BANKRUPT,
-                player=current_player,
-                amount=self.game_state.player_balances[current_player]
-            )
-            custom_print(f"{current_player} is bankrupt")
-            custom_print("GAME OVER")
-            return -1
+            self.__handle_bankruptcy(current_player)
         
         dice_roll = None
 
         # Handle jail logic
-        if self.game_state.in_jail[current_player]:
+        if self.game_state.in_jail[current_player] == True:
             # try to roll a double
-            dice_roll = self.dice_manager.roll()
-            
-            self.event_manager.register_event(
-                EventType.DICE_ROLLED,
-                player=current_player,
-                dice=dice_roll,
-                additional_data={"in_jail": True}
-            )
-            
+            dice_roll = self.__roll_a_dice(current_player, in_jail=True)
             if dice_roll[0] == dice_roll[1]:
-                self.game_state.get_out_of_jail(current_player)
-                self.event_manager.register_event(
-                    EventType.PLAYER_GOT_OUT_OF_JAIL,
-                    player=current_player,
-                    description=f"{current_player} got out of jail by rolling doubles"
-                )
+                # already got out of jail from rolling doubles
+                pass
 
             # if the player has been in jail for 3 turns, must pay fine
             elif self.game_state.turns_in_jail[current_player] == 2:
-                try:
-                    self.game_state.pay_get_out_of_jail_fine(current_player)
-                    self.event_manager.register_event(
-                        EventType.PLAYER_GOT_OUT_OF_JAIL,
-                        player=current_player,
-                        amount=self.game_state.board.get_jail_fine(),
-                        description=f"{current_player} paid ${self.game_state.board.get_jail_fine()} to get out of jail"
-                    )
-                    self.event_manager.register_event(
-                        EventType.MONEY_PAID,
-                        player=current_player,
-                        amount=self.game_state.board.get_jail_fine(),
-                        description=f"{current_player} paid ${self.game_state.board.get_jail_fine()} jail fine"
-                    )
-                except NotEnoughBalanceException:
-                    self.event_manager.register_event(
-                        EventType.PLAYER_BANKRUPT,
-                        player=current_player,
-                        amount=self.game_state.player_balances[current_player]
-                    )
-                    custom_print(f"{current_player} is bankrupt")
-                    custom_print("GAME OVER")
-                    return -1
-                except Exception as e:
-                    ErrorLogger.log_error(e)
-                    raise e
-                    
+                self.__handle_paying_tax_to_get_out_of_jail(current_player)
 
             # try to use the escape jail card
             elif current_player.should_use_escape_jail_card(self.game_state):
-                self.game_state.use_escape_jail_card(current_player)
-
-                # remove the escape jail card from the player
-                if self.community_chest_manager.get_out_of_jail_card_owner == current_player:
-                    self.community_chest_manager.use_get_out_of_jail_card(current_player)
-                elif self.chance_manager.get_out_of_jail_card_owner == current_player:
-                    self.chance_manager.use_get_out_of_jail_card(current_player)
-
-                self.event_manager.register_event(
-                    EventType.GET_OUT_OF_JAIL_CARD_USED,
-                    player=current_player,
-                    description=f"{current_player} used a Get Out of Jail Free card"
-                )
-                self.event_manager.register_event(
-                    EventType.PLAYER_GOT_OUT_OF_JAIL,
-                    player=current_player,
-                    description=f"{current_player} got out of jail with a card"
-                )
+                self.__handle_using_get_out_of_jail_card(current_player)
 
             # try to pay the fine
             elif current_player.should_pay_get_out_of_jail_fine(self.game_state):
-                try:
-                    self.game_state.pay_get_out_of_jail_fine(current_player)
-                    self.event_manager.register_event(
-                        EventType.PLAYER_GOT_OUT_OF_JAIL,
-                        player=current_player,
-                        amount=self.game_state.board.get_jail_fine(),
-                        description=f"{current_player} paid ${self.game_state.board.get_jail_fine()} to get out of jail"
-                    )
-                    self.event_manager.register_event(
-                        EventType.MONEY_PAID,
-                        player=current_player,
-                        amount=self.game_state.board.get_jail_fine(),
-                        description=f"{current_player} paid ${self.game_state.board.get_jail_fine()} jail fine"
-                    )
-                except NotEnoughBalanceException:
-                    self.event_manager.register_event(
-                        EventType.PLAYER_BANKRUPT,
-                        player=current_player,
-                        amount=self.game_state.player_balances[current_player]
-                    )
-                    custom_print(f"{current_player} is bankrupt")
-                    custom_print("GAME OVER")
-                    return -1
-                except Exception as e:
-                    ErrorLogger.log_error(e)
-                    raise e
+                self.__handle_paying_tax_to_get_out_of_jail(current_player)
 
             # count the turn in jail
             else:
-                self.game_state.count_turn_in_jail(current_player)
-                self.event_manager.register_event(
-                    EventType.TURN_ENDED,
-                    player=current_player,
-                    description=f"{current_player} remains in jail for turn {self.game_state.turns_in_jail[current_player]}"
-                )
-                self.__handle_in_jail_actions(current_player)
+                self.__count_turn_in_jail(current_player)
                 return
 
         # Roll the dice if the player did not roll a double in attempt to get out of jail
         if dice_roll is None:
-            dice_roll = self.dice_manager.roll()
-            
-            self.event_manager.register_event(
-                EventType.DICE_ROLLED,
-                player=current_player,
-                dice=dice_roll
-            )
-            
-            if dice_roll[0] == dice_roll[1]:
-                self.event_manager.register_event(
-                    EventType.DOUBLES_ROLLED,
-                    player=current_player,
-                    dice=dice_roll
-                )
-            
-            custom_print(f"{current_player} rolled {dice_roll[0]} and {dice_roll[1]}")
+            dice_roll = self.__roll_a_dice(current_player, in_jail=False)
 
         # Move the player
-        try:
-            old_position = self.game_state.player_positions[current_player]
-            self.game_state.move_player(current_player, dice_roll)
-            new_position = self.game_state.player_positions[current_player]
-            
-            # Check if player passed GO
-            if new_position < old_position and not self.game_state.in_jail[current_player]:
-                self.event_manager.register_event(
-                    EventType.PLAYER_PASSED_GO,
-                    player=current_player,
-                    amount=200,
-                    description=f"{current_player} passed GO and collected $200"
-                )
-                self.event_manager.register_event(
-                    EventType.MONEY_RECEIVED,
-                    player=current_player,
-                    amount=200,
-                    description=f"{current_player} collected $200 for passing GO"
-                )
-            
-            # Register player movement event
-            current_tile = self.game_state.board.tiles[new_position]
-            self.event_manager.register_event(
-                EventType.PLAYER_MOVED,
-                player=current_player,
-                tile=current_tile,
-                additional_data={"position": new_position, "dice_roll": dice_roll}
-            )
-            
-        except NotEnoughBalanceException:
-            self.event_manager.register_event(
-                EventType.PLAYER_BANKRUPT,
-                player=current_player,
-                amount=self.game_state.player_balances[current_player]
-            )
-            custom_print(f"{current_player} is bankrupt")
-            custom_print("GAME OVER")
-            return -1
-        except Exception as e:
-            ErrorLogger.log_error(e)
-            raise e
+        self.__move_player(current_player, dice_roll)
 
-        
         current_position = self.game_state.player_positions[current_player]
         current_tile = self.game_state.board.tiles[current_position]
 
         # check if the player went to jail
-        if isinstance(current_tile, Jail) and self.game_state.in_jail[current_player]:
-            self.event_manager.register_event(
-                EventType.PLAYER_WENT_TO_JAIL,
-                player=current_player,
-                description=f"{current_player} was sent to jail"
-            )
-
-            self.event_manager.register_event(
-                EventType.TURN_ENDED,
-                player=current_player,
-                description=f"{current_player}'s turn ended"
-            )
+        if self.__was_player_sent_to_jail(current_player, current_tile):
             return
 
-        
         # Handle landing on chance/community chest
+        self.__handle_landing_on_chance(current_player, current_tile)
+
+        # check if the player went to jail from chance card
+        if self.__was_player_sent_to_jail(current_player, current_tile):
+            return
+        
+
         if isinstance(current_tile, Chance):
             self.event_manager.register_event(
                 EventType.CHANCE_CARD_DRAWN,
@@ -282,14 +132,7 @@ class GameManager:
                 current_tile = self.game_state.board.tiles[current_position]
 
             except NotEnoughBalanceException:
-                self.event_manager.register_event(
-                    EventType.PLAYER_BANKRUPT,
-                    player=current_player,
-                    amount=self.game_state.player_balances[current_player]
-                )
-                custom_print(f"{current_player} is bankrupt")
-                custom_print("GAME OVER")
-                return -1
+                self.__handle_bankruptcy(current_player)
             
             except Exception as e:
                 ErrorLogger.log_error(e)
@@ -318,14 +161,8 @@ class GameManager:
                 current_tile = self.game_state.board.tiles[current_position]
 
             except NotEnoughBalanceException:
-                self.event_manager.register_event(
-                    EventType.PLAYER_BANKRUPT,
-                    player=current_player,
-                    amount=self.game_state.player_balances[current_player]
-                )
-                custom_print(f"{current_player} is bankrupt")
-                custom_print("GAME OVER")
-                return -1
+                self.__handle_bankruptcy(current_player)
+
             except Exception as e:
                 ErrorLogger.log_error(e)
                 custom_print("Error in community chest card action")
@@ -343,15 +180,10 @@ class GameManager:
                     amount=current_tile.tax,
                     description=f"{current_player} paid ${current_tile.tax} in taxes"
                 )
+
             except NotEnoughBalanceException:
-                self.event_manager.register_event(
-                    EventType.PLAYER_BANKRUPT,
-                    player=current_player,
-                    amount=self.game_state.player_balances[current_player]
-                )
-                custom_print(f"{current_player} is bankrupt")
-                custom_print("GAME OVER")
-                return -1
+                self.__handle_bankruptcy(current_player)
+
             except Exception as e:
                 ErrorLogger.log_error(e)
                 raise e
@@ -389,14 +221,8 @@ class GameManager:
                 self.game_state.pay_rent(current_player, current_tile, dice_roll)
             
             except NotEnoughBalanceException:
-                self.event_manager.register_event(
-                    EventType.PLAYER_BANKRUPT,
-                    player=current_player,
-                    amount=self.game_state.player_balances[current_player]
-                )
-                custom_print(f"{current_player} is bankrupt")
-                custom_print("GAME OVER")
-                return -1
+                self.__handle_bankruptcy(current_player)
+
             except Exception as e:
                 ErrorLogger.log_error(e)
                 custom_print("Player does not have enough balance to pay rent")
@@ -420,15 +246,8 @@ class GameManager:
                     self.game_state.buy_property(current_player, current_tile)
                 
                 except NotEnoughBalanceException:
-                    self.event_manager.register_event(
-                        EventType.MONEY_PAID,
-                        player=current_player,
-                        amount=price,
-                        description=f"{current_player} was unable to buy {current_tile} due to insufficient funds"
-                    )
-                    custom_print(f"{current_player} is bankrupt")
-                    custom_print("GAME OVER")
-                    return -1
+                    self.__handle_bankruptcy(current_player)
+
                 except Exception as e:
                     ErrorLogger.log_error(e)
                     custom_print("Player does not have enough balance to buy the property")
@@ -496,7 +315,8 @@ class GameManager:
                 self.game_state.downgrade_property_group(current_player, suggestion)
             except Exception as e:
                 if isinstance(e, NotEnoughBalanceException):
-                    raise e
+                    self.__handle_bankruptcy(current_player)
+                    return
                 
                 # TODO: Handle player bankruptcy
                 ErrorLogger.log_error(e)
@@ -510,7 +330,8 @@ class GameManager:
                 self.game_state.unmortgage_property(current_player, suggestion)
             except Exception as e:
                 if isinstance(e, NotEnoughBalanceException):
-                    raise e
+                    self.__handle_bankruptcy(current_player)
+                    return
                 
                 # TODO: Handle error
                 ErrorLogger.log_error(e)
@@ -525,7 +346,8 @@ class GameManager:
                 self.game_state.mortgage_property(current_player, suggestion)
             except Exception as e:
                 if isinstance(e, NotEnoughBalanceException):
-                    raise e
+                    self.__handle_bankruptcy(current_player)
+                    return
                 
                 # TODO: Handle player bankruptcy
                 ErrorLogger.log_error(e)
@@ -540,7 +362,8 @@ class GameManager:
                 self.game_state.update_property_group(current_player, suggestion)
             except Exception as e:
                 if isinstance(e, NotEnoughBalanceException):
-                    raise e
+                    self.__handle_bankruptcy(current_player)
+                    return
                 
                 # TODO: Handle player bankruptcy
                 ErrorLogger.log_error(e)
@@ -598,3 +421,184 @@ class GameManager:
             rent = 0
             
         return rent
+    
+
+    def __handle_bankruptcy(self, current_player: Player):
+        self.event_manager.register_event(
+            EventType.PLAYER_BANKRUPT,
+            player=current_player,
+            amount=self.game_state.player_balances[current_player]
+        )
+        custom_print(f"{current_player} is bankrupt")
+        custom_print("GAME OVER")
+        # return -1
+        raise BankrupcyException(current_player.name)
+    
+
+    def __handle_paying_tax_to_get_out_of_jail(self, current_player: Player):
+        try:
+            self.game_state.pay_get_out_of_jail_fine(current_player)
+            self.event_manager.register_event(
+                EventType.PLAYER_GOT_OUT_OF_JAIL,
+                player=current_player,
+                amount=self.game_state.board.get_jail_fine(),
+                description=f"{current_player} paid ${self.game_state.board.get_jail_fine()} to get out of jail"
+            )
+            self.event_manager.register_event(
+                EventType.MONEY_PAID,
+                player=current_player,
+                amount=self.game_state.board.get_jail_fine(),
+                description=f"{current_player} paid ${self.game_state.board.get_jail_fine()} jail fine"
+            )
+
+        except NotEnoughBalanceException:
+            self.__handle_bankruptcy(current_player)
+
+        except Exception as e:
+            ErrorLogger.log_error(e)
+            raise e
+        
+    
+    def __handle_using_get_out_of_jail_card(self, current_player: Player):
+        self.game_state.use_escape_jail_card(current_player)
+
+        # remove the escape jail card from the player
+        if self.community_chest_manager.get_out_of_jail_card_owner == current_player:
+            self.community_chest_manager.use_get_out_of_jail_card(current_player)
+        elif self.chance_manager.get_out_of_jail_card_owner == current_player:
+            self.chance_manager.use_get_out_of_jail_card(current_player)
+
+        self.event_manager.register_event(
+            EventType.GET_OUT_OF_JAIL_CARD_USED,
+            player=current_player,
+            description=f"{current_player} used a Get Out of Jail Free card"
+        )
+        self.event_manager.register_event(
+            EventType.PLAYER_GOT_OUT_OF_JAIL,
+            player=current_player,
+            description=f"{current_player} got out of jail with a card"
+        )
+
+    
+    def __roll_a_dice(self, current_player: str, in_jail: bool) -> Tuple[int, int]:
+        dice_roll = self.dice_manager.roll()
+            
+        self.event_manager.register_event(
+            EventType.DICE_ROLLED,
+            player=current_player,
+            dice=dice_roll,
+            additional_data={"in_jail": True} if in_jail else {}
+        )
+        
+        if dice_roll[0] == dice_roll[1]:
+            if in_jail:
+                self.game_state.get_out_of_jail(current_player)
+                self.event_manager.register_event(
+                    EventType.PLAYER_GOT_OUT_OF_JAIL,
+                    player=current_player,
+                    description=f"{current_player} got out of jail by rolling doubles"
+                )
+            else:
+                self.event_manager.register_event(
+                    EventType.DOUBLES_ROLLED,
+                    player=current_player,
+                    dice=dice_roll
+                )
+        
+        custom_print(f"{current_player} rolled {dice_roll[0]} and {dice_roll[1]}")
+        return dice_roll
+    
+
+    def __count_turn_in_jail(self, current_player: Player):
+        self.game_state.count_turn_in_jail(current_player)
+        self.event_manager.register_event(
+            EventType.TURN_ENDED,
+            player=current_player,
+            description=f"{current_player} remains in jail for turn {self.game_state.turns_in_jail[current_player]}"
+        )
+        self.__handle_in_jail_actions(current_player)
+
+
+    def __move_player(self, current_player: Player, dice_roll: Tuple[int, int]):
+        try:
+            old_position = self.game_state.player_positions[current_player]
+            self.game_state.move_player(current_player, dice_roll)
+            new_position = self.game_state.player_positions[current_player]
+            
+            # Check if player passed GO
+            if new_position < old_position and not self.game_state.in_jail[current_player]:
+                self.event_manager.register_event(
+                    EventType.PLAYER_PASSED_GO,
+                    player=current_player,
+                    amount=200,
+                    description=f"{current_player} passed GO and collected $200"
+                )
+                self.event_manager.register_event(
+                    EventType.MONEY_RECEIVED,
+                    player=current_player,
+                    amount=200,
+                    description=f"{current_player} collected $200 for passing GO"
+                )
+            
+            # Register player movement event
+            current_tile = self.game_state.board.tiles[new_position]
+            self.event_manager.register_event(
+                EventType.PLAYER_MOVED,
+                player=current_player,
+                tile=current_tile,
+                additional_data={"position": new_position, "dice_roll": dice_roll}
+            )
+            
+        except NotEnoughBalanceException:
+            self.__handle_bankruptcy(current_player)
+
+        except Exception as e:
+            ErrorLogger.log_error(e)
+            raise e
+        
+
+    def __was_player_sent_to_jail(self, current_player: Player, current_tile: Tile) -> bool:
+        if isinstance(current_tile, Jail) and self.game_state.in_jail[current_player]:
+            self.event_manager.register_event(
+                EventType.PLAYER_WENT_TO_JAIL,
+                player=current_player,
+                description=f"{current_player} was sent to jail"
+            )
+
+            self.event_manager.register_event(
+                EventType.TURN_ENDED,
+                player=current_player,
+                description=f"{current_player}'s turn ended"
+            )
+            return True
+        return False
+    
+
+    def __handle_landing_on_chance(self, current_player: Player, current_tile: Tile):
+        # Handle landing on chance/community chest
+        if isinstance(current_tile, Chance):
+            self.event_manager.register_event(
+                EventType.CHANCE_CARD_DRAWN,
+                player=current_player,
+                tile=current_tile,
+                description=f"{current_player} landed on Chance"
+            )
+            
+            dice_roll = self.dice_manager.roll()
+            chance_card = self.chance_manager.draw_card(self.game_state, current_player, dice_roll)
+            try:
+                custom_print("Performing chance card action", chance_card)
+                # Execute the card action
+                chance_card.action(*chance_card.args)
+
+                # updating the player position after the card action
+                current_position = self.game_state.player_positions[current_player]
+                current_tile = self.game_state.board.tiles[current_position]
+
+            except NotEnoughBalanceException:
+                self.__handle_bankruptcy(current_player)
+            
+            except Exception as e:
+                ErrorLogger.log_error(e)
+                custom_print("Error in chance card action")
+                raise e
