@@ -20,6 +20,9 @@ class GameValidation:
         if property in game_state.is_owned:
             return PropertyAlreadyOwnedException(str(property))
         
+        if property in game_state.mortgaged_properties:
+            return PropertyMortagedException(str(property))
+        
         if game_state.player_balances[player] < property.price:
             return NotEnoughBalanceException(property.price, game_state.player_balances[player])
         
@@ -379,4 +382,22 @@ class GameValidation:
                 return ExcedingMoneyInTraddingOfferException(str(trade_offer.target_player), trade_offer.money_requested)
         
                     
+        return None
+    
+
+    @staticmethod
+    def validate_property_in_trade_offer(game_state: GameState, property: Tile, player: Player) -> Optional[GameException]:
+        if property not in game_state.is_owned:
+            return PropertyNotOwnedException(str(property))
+        
+        if property not in game_state.properties[player]:
+            return NotPropertyOwnerException(str(property), str(player))
+        
+        if property in game_state.mortgaged_properties:
+            return MortgagePropertyTradeException(str(property))
+        
+        if isinstance(property, Property):
+            if game_state.houses[property.group][0] > 0 or game_state.hotels[property.group][0] > 0:
+                return PropertyHasImprovementsException(str(property))
+            
         return None
