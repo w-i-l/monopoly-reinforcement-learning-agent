@@ -219,7 +219,7 @@ class GameValidation:
 
     @staticmethod
     def validate_pay_players(game_state: GameState, player: Player, amount: int) -> Optional[GameException]:
-        receivers_count = game_state.players_count - 1
+        receivers_count = len(game_state.players) - 1
         if game_state.player_balances[player] < amount * receivers_count:
             return NotEnoughBalanceException(amount * receivers_count, game_state.player_balances[player])
         
