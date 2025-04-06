@@ -61,7 +61,7 @@ class GameManager:
         # Check for bankruptcy
         # TODO: Handle each player individually, rather than ending the game
         if self.game_state.player_balances[current_player] < 0:
-            self.__handle_bankruptcy(current_player)
+            self.__declare_player_bankrupt(current_player)
         
         dice_roll = None
 
@@ -107,6 +107,10 @@ class GameManager:
         # Handle landing on chance/community chest
         self.__handle_landing_on_chance(current_player, current_tile)
 
+        # updating the player position after the card action
+        current_position = self.game_state.player_positions[current_player]
+        current_tile = self.game_state.board.tiles[current_position]
+
         # check if the player went to jail from chance card
         if self.__was_player_sent_to_jail(current_player, current_tile):
             return
@@ -122,8 +126,10 @@ class GameManager:
             
             dice_roll = self.dice_manager.roll()
             chance_card = self.chance_manager.draw_card(self.game_state, current_player, dice_roll)
-            try:
-                custom_print("Performing chance card action", chance_card)
+
+            def action_to_perform():
+                nonlocal current_position, current_tile
+
                 # Execute the card action
                 chance_card.action(*chance_card.args)
 
@@ -131,8 +137,16 @@ class GameManager:
                 current_position = self.game_state.player_positions[current_player]
                 current_tile = self.game_state.board.tiles[current_position]
 
-            except NotEnoughBalanceException:
-                self.__handle_bankruptcy(current_player)
+            try:
+               custom_print("Performing chance card action", chance_card)
+
+               action_to_perform()
+
+            except NotEnoughBalanceException as e:
+                self.__handle_bankruptcy(current_player, e.price, reason="chance card action")
+
+                # player submitted a bankruptcy request
+                action_to_perform()
             
             except Exception as e:
                 ErrorLogger.log_error(e)
@@ -150,8 +164,9 @@ class GameManager:
             )
             
             community_chest_card = self.community_chest_manager.draw_card(self.game_state, current_player)
-            try:
-                custom_print("Performing community chest card action", community_chest_card)
+
+            def action_to_perform():
+                nonlocal current_position, current_tile
                 
                 # Execute the card action
                 community_chest_card.action(*community_chest_card.args)
@@ -160,8 +175,16 @@ class GameManager:
                 current_position = self.game_state.player_positions[current_player]
                 current_tile = self.game_state.board.tiles[current_position]
 
-            except NotEnoughBalanceException:
-                self.__handle_bankruptcy(current_player)
+            try:
+                custom_print("Performing community chest card action", community_chest_card)
+
+                action_to_perform()
+
+            except NotEnoughBalanceException as e:
+                self.__handle_bankruptcy(current_player, e.price, reason="community chest card action")
+
+                # player submitted a bankruptcy request
+                action_to_perform()
 
             except Exception as e:
                 ErrorLogger.log_error(e)
@@ -172,8 +195,12 @@ class GameManager:
         # needs to be after community chest and chance
         # because player can land on a tax tile from those
         if isinstance(current_tile, Taxes):
-            try: 
+
+            def action_to_perform():
                 self.game_state.pay_tax(current_player, current_tile.tax)
+
+            try: 
+                # Register tax payment event
                 self.event_manager.register_event(
                     EventType.TAX_PAID,
                     player=current_player,
@@ -181,8 +208,13 @@ class GameManager:
                     description=f"{current_player} paid ${current_tile.tax} in taxes"
                 )
 
-            except NotEnoughBalanceException:
-                self.__handle_bankruptcy(current_player)
+                action_to_perform()
+
+            except NotEnoughBalanceException as e:
+                self.__handle_bankruptcy(current_player, e.price, reason="paying tax")
+
+                # player submitted a bankruptcy request
+                action_to_perform()
 
             except Exception as e:
                 ErrorLogger.log_error(e)
@@ -194,6 +226,11 @@ class GameManager:
         if current_tile in self.game_state.is_owned and\
            current_tile not in self.game_state.properties[current_player] and\
            current_tile not in self.game_state.mortgaged_properties:
+            
+            def action_to_perform():
+                # Process the rent payment
+                self.game_state.pay_rent(current_player, current_tile, dice_roll)
+
             try:
                 dice_roll = self.dice_manager.roll()
                 
@@ -217,11 +254,13 @@ class GameManager:
                     description=f"{current_player} paid ${rent_amount} rent to {owner} for {current_tile}"
                 )
                 
-                # Process the rent payment
-                self.game_state.pay_rent(current_player, current_tile, dice_roll)
+                action_to_perform()
             
-            except NotEnoughBalanceException:
-                self.__handle_bankruptcy(current_player)
+            except NotEnoughBalanceException as e:
+                self.__handle_bankruptcy(current_player, e.price, reason="paying rent")
+
+                # player submitted a bankruptcy request
+                action_to_perform()
 
             except Exception as e:
                 ErrorLogger.log_error(e)
@@ -231,6 +270,11 @@ class GameManager:
         # Check if the player landed on an unowned property
         elif current_tile not in self.game_state.is_owned:
             if current_player.should_buy_property(self.game_state, current_tile):
+
+                def action_to_perform():
+                    # Process the purchase
+                    self.game_state.buy_property(current_player, current_tile) 
+
                 try:
                     # Register property purchase event
                     price = getattr(current_tile, 'price', 0)
@@ -242,11 +286,13 @@ class GameManager:
                         description=f"{current_player} purchased {current_tile} for ${price}"
                     )
                     
-                    # Process the purchase
-                    self.game_state.buy_property(current_player, current_tile)
+                    action_to_perform()
                 
-                except NotEnoughBalanceException:
-                    self.__handle_bankruptcy(current_player)
+                except NotEnoughBalanceException as e:
+                    self.__handle_bankruptcy(current_player, e.price, reason="buying property")
+
+                    # player submitted a bankruptcy request
+                    action_to_perform()
 
                 except Exception as e:
                     ErrorLogger.log_error(e)
@@ -267,22 +313,7 @@ class GameManager:
         trade_offers = current_player.get_trade_offers(self.game_state)
         if trade_offers and trade_offers != []:
             for trade_offer in trade_offers:
-                # Register trade offer event
-                self.event_manager.register_event(
-                    EventType.TRADE_OFFERED,
-                    player=trade_offer.source_player,
-                    target_player=trade_offer.target_player,
-                    additional_data={"trade_offer": trade_offer},
-                    description=f"{trade_offer.source_player} offered a trade to {trade_offer.target_player}"
-                )
-                
-                # Process the trade
-                self.trade_manager.execute_trade(
-                    trade_offer, 
-                    self.game_state,
-                    community_chest_manager=self.community_chest_manager,
-                    chance_manager=self.chance_manager
-                )
+                self.__execute_trade(trade_offer)
 
         # Check if the player wants to downgrade properties
         self.__handle_downgrading_suggestions(current_player)
@@ -306,6 +337,25 @@ class GameManager:
                 player=current_player,
                 description=f"{current_player}'s turn ended"
             )
+
+
+    def __execute_trade(self, trade_offer):
+        # Register trade offer event
+        self.event_manager.register_event(
+            EventType.TRADE_OFFERED,
+            player=trade_offer.source_player,
+            target_player=trade_offer.target_player,
+            additional_data={"trade_offer": trade_offer},
+            description=f"{trade_offer.source_player} offered a trade to {trade_offer.target_player}"
+        )
+        
+        # Process the trade
+        self.trade_manager.execute_trade(
+            trade_offer, 
+            self.game_state,
+            community_chest_manager=self.community_chest_manager,
+            chance_manager=self.chance_manager
+        )
             
 
     def __handle_downgrading_suggestions(self, current_player):
@@ -313,12 +363,8 @@ class GameManager:
         for suggestion in suggestions:
             try:
                 self.game_state.downgrade_property_group(current_player, suggestion)
+
             except Exception as e:
-                if isinstance(e, NotEnoughBalanceException):
-                    self.__handle_bankruptcy(current_player)
-                    return
-                
-                # TODO: Handle player bankruptcy
                 ErrorLogger.log_error(e)
                 return -1
             
@@ -328,11 +374,14 @@ class GameManager:
         for suggestion in suggestions:
             try:
                 self.game_state.unmortgage_property(current_player, suggestion)
+
+            except NotEnoughBalanceException as e:
+                self.__handle_bankruptcy(current_player, e.price, reason="unmortgaging property")
+
+                # player submitted a bankruptcy request
+                self.game_state.unmortgage_property(current_player, suggestion)
+
             except Exception as e:
-                if isinstance(e, NotEnoughBalanceException):
-                    self.__handle_bankruptcy(current_player)
-                    return
-                
                 # TODO: Handle error
                 ErrorLogger.log_error(e)
                 return -1
@@ -340,34 +389,29 @@ class GameManager:
             
     def __handle_mortgaging_suggestions(self, current_player):
         suggestions = current_player.get_mortgaging_suggestions(self.game_state)
-        # custom_print("Mortgaging suggestions: ", suggestions)
         for suggestion in suggestions:
             try:
                 self.game_state.mortgage_property(current_player, suggestion)
+            
             except Exception as e:
-                if isinstance(e, NotEnoughBalanceException):
-                    self.__handle_bankruptcy(current_player)
-                    return
-                
-                # TODO: Handle player bankruptcy
                 ErrorLogger.log_error(e)
-                custom_print("Player does not have enough balance to mortgage the property")
                 return -1
             
     def __handle_upgrading_suggestions(self, current_player):
         suggestions = current_player.get_upgrading_suggestions(self.game_state)
-        # custom_print("Upgrading suggestions: ", suggestions)
         for suggestion in suggestions:
             try:
                 self.game_state.update_property_group(current_player, suggestion)
+
+            except NotEnoughBalanceException as e:
+                self.__handle_bankruptcy(current_player, e.price, reason="upgrading property")
+
+                # player submitted a bankruptcy request
+                self.game_state.update_property_group(current_player, suggestion)
+                return
+
             except Exception as e:
-                if isinstance(e, NotEnoughBalanceException):
-                    self.__handle_bankruptcy(current_player)
-                    return
-                
-                # TODO: Handle player bankruptcy
                 ErrorLogger.log_error(e)
-                custom_print("Player does not have enough balance to upgrade the property")
                 return -1
             
     
@@ -423,7 +467,46 @@ class GameManager:
         return rent
     
 
-    def __handle_bankruptcy(self, current_player: Player):
+    def __handle_bankruptcy(self, current_player: Player, amount: int, reason: Optional[str] = None):
+        self.event_manager.register_event(
+            EventType.PLAYER_DID_NOT_HAVE_ENOUGH_MONEY,
+            player=current_player,
+            amount=amount,
+            reason=reason,
+            description=f"{current_player} did not have enough money to pay ${amount} for {reason}"
+        )
+
+        bankruptcy_request = current_player.handle_banckruptcy(self.game_state, amount)
+        if bankruptcy_request.is_empty():
+            # Player is bankrupt
+            self.__declare_player_bankrupt(current_player)
+        
+        # execute bankruptcy request
+        else:
+            # erase the trade offers
+            bankruptcy_request.trade_offers = []
+
+            try:
+                # complete the bankruptcy request
+                self.game_state.complete_bankruptcy_request(current_player, bankruptcy_request)
+
+                # execute trades with trade manager
+                trade_offers = bankruptcy_request.trade_offers
+                for trade_offer in trade_offers:
+                    self.__execute_trade(trade_offer)
+
+            except Exception as e:
+                # something happened no need to continue
+                ErrorLogger.log_error(e)
+                raise e
+                # self.__declare_player_bankrupt(current_player)
+
+
+    def __declare_player_bankrupt(self, current_player: Player):
+        # This will signal that a player is bankrupt
+        # the proper way to handle it should be decided from outside
+        # in case of a 2 players game, the game will end
+
         self.event_manager.register_event(
             EventType.PLAYER_BANKRUPT,
             player=current_player,
@@ -451,8 +534,9 @@ class GameManager:
                 description=f"{current_player} paid ${self.game_state.board.get_jail_fine()} jail fine"
             )
 
-        except NotEnoughBalanceException:
-            self.__handle_bankruptcy(current_player)
+        except NotEnoughBalanceException as e:
+            self.__handle_bankruptcy(current_player, e.price, reason="paying jail fine")
+            self.game_state.pay_get_out_of_jail_fine(current_player)
 
         except Exception as e:
             ErrorLogger.log_error(e)
@@ -549,8 +633,8 @@ class GameManager:
                 additional_data={"position": new_position, "dice_roll": dice_roll}
             )
             
-        except NotEnoughBalanceException:
-            self.__handle_bankruptcy(current_player)
+        except NotEnoughBalanceException as e:
+            self.__handle_bankruptcy(current_player, e.price, reason="moving player")
 
         except Exception as e:
             ErrorLogger.log_error(e)
@@ -591,12 +675,11 @@ class GameManager:
                 # Execute the card action
                 chance_card.action(*chance_card.args)
 
-                # updating the player position after the card action
-                current_position = self.game_state.player_positions[current_player]
-                current_tile = self.game_state.board.tiles[current_position]
+            except NotEnoughBalanceException as e:
+                self.__handle_bankruptcy(current_player, e.price, reason="chance card action")
 
-            except NotEnoughBalanceException:
-                self.__handle_bankruptcy(current_player)
+                # Execute the card action
+                chance_card.action(*chance_card.args)
             
             except Exception as e:
                 ErrorLogger.log_error(e)

@@ -27,6 +27,7 @@ class EventType(Enum):
     TAX_PAID = auto()
     MONEY_RECEIVED = auto()
     MONEY_PAID = auto()
+    PLAYER_DID_NOT_HAVE_ENOUGH_MONEY = auto()
     PLAYER_BANKRUPT = auto()
     
     # Card Events
@@ -79,6 +80,7 @@ class Event:
     dice: Optional[tuple[int, int]] = None
     description: str = ""
     additional_data: Dict[str, Any] = None
+    reason: Optional[str] = None
     
     def __post_init__(self):
         if self.additional_data is None:
@@ -111,6 +113,7 @@ class Event:
             EventType.MONEY_RECEIVED: f"{self.player} received ${self.amount}" if self.amount else f"{self.player} received money",
             EventType.MONEY_PAID: f"{self.player} paid ${self.amount}" if self.amount else f"{self.player} paid money",
             EventType.PLAYER_BANKRUPT: f"{self.player} went bankrupt",
+            EventType.PLAYER_DID_NOT_HAVE_ENOUGH_MONEY: f"{self.player} did not have enough money to pay ${self.amount} for {self.reason}",
             
             EventType.CHANCE_CARD_DRAWN: f"{self.player} drew a Chance card",
             EventType.COMMUNITY_CHEST_CARD_DRAWN: f"{self.player} drew a Community Chest card",

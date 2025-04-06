@@ -10,6 +10,7 @@ from models.railway import Railway
 from models.trade_offer import TradeOffer
 import numpy as np
 from game.game_validation import GameValidation
+from game.bankruptcy_request import BankruptcyRequest
 
 class RandomAgent(Player):
     def __init__(self, name, cache_size=5000):
@@ -246,6 +247,133 @@ class RandomAgent(Player):
         return trade_offers
 
 
-
-
-    
+    def handle_banckruptcy(self, game_state: GameState, amount: int) -> BankruptcyRequest:
+        # Quick return if we have enough money
+        current_balance = game_state.player_balances[self]
+        if current_balance >= amount:
+            return BankruptcyRequest([], [], [])
+        
+        needed_amount = amount - current_balance
+        money_raised = 0
+        
+        # Use sets for faster lookups
+        owned_properties = set(game_state.properties[self])
+        mortgaged_properties = set(prop for prop in owned_properties if prop in game_state.mortgaged_properties)
+        unmortgaged_properties = owned_properties - mortgaged_properties
+        
+        # Pre-calculate mortgageable properties to avoid redundant checks later
+        properties_with_buildings = set()
+        downgrade_suggestions = []
+        mortgage_suggestions = []
+        
+        # Fast path: Check if we can raise enough money by just mortgaging properties
+        # This avoids the expensive building calculations if possible
+        quick_mortgage_value = 0
+        mortgageable_props = []
+        
+        for prop in unmortgaged_properties:
+            if not isinstance(prop, Property):
+                # Utilities and railroads can always be mortgaged
+                mortgageable_props.append(prop)
+                quick_mortgage_value += prop.mortgage
+        
+        # If we can raise enough just with utilities and railroads, do that
+        if quick_mortgage_value >= needed_amount:
+            for prop in mortgageable_props:
+                mortgage_suggestions.append(prop)
+                money_raised += prop.mortgage
+                if money_raised >= needed_amount:
+                    break
+            return BankruptcyRequest([], mortgage_suggestions, [])
+        
+        # We need to consider buildings - identify groups with buildings once
+        groups_with_buildings = {}
+        for group in PropertyGroup:
+            # Skip groups we don't fully own
+            group_properties = set(game_state.board.get_properties_by_group(group))
+            if not group_properties.issubset(owned_properties):
+                continue
+            
+            # Check for hotels or houses
+            hotel_count, hotel_owner = game_state.hotels[group]
+            house_count, house_owner = game_state.houses[group]
+            
+            if (hotel_count > 0 and hotel_owner == self) or (house_count > 0 and house_owner == self):
+                # Store the building info for this group
+                groups_with_buildings[group] = {
+                    'hotel_count': hotel_count if hotel_owner == self else 0,
+                    'house_count': house_count if house_owner == self else 0,
+                    'prop_count': len(group_properties),
+                    'properties': group_properties
+                }
+                # Mark these properties as having buildings
+                properties_with_buildings.update(group_properties)
+        
+        # STEP 1: Sell buildings (hotels first, then houses)
+        for group, info in groups_with_buildings.items():
+            if money_raised >= needed_amount:
+                break
+                
+            # Sell hotel if any
+            if info['hotel_count'] > 0:
+                hotel_value = group.hotel_cost() // 2
+                downgrade_suggestions.append(group)
+                money_raised += hotel_value
+                
+                # If selling the hotel is enough, we're done
+                if money_raised >= needed_amount:
+                    break
+            
+            # Sell houses if any
+            house_count = info['house_count']
+            if house_count > 0:
+                house_value_per_level = group.house_cost() * info['prop_count'] // 2
+                houses_needed = min(house_count, 
+                                    (needed_amount - money_raised + house_value_per_level - 1) // house_value_per_level)
+                
+                # Add group multiple times based on how many levels we need to sell
+                for _ in range(houses_needed):
+                    downgrade_suggestions.append(group)
+                    money_raised += house_value_per_level
+        
+        # STEP 2: Mortgage properties if needed
+        if money_raised < needed_amount:
+            # Add properties that don't have buildings or whose buildings we're removing
+            for prop in unmortgaged_properties:
+                if money_raised >= needed_amount:
+                    break
+                    
+                can_mortgage = True
+                
+                if prop in properties_with_buildings:
+                    # For properties with buildings, check if we're selling all buildings
+                    if isinstance(prop, Property):
+                        group = prop.group
+                        if group in groups_with_buildings:
+                            group_info = groups_with_buildings[group]
+                            
+                            # Count how many downgrades we're doing for this group
+                            downgrade_count = downgrade_suggestions.count(group)
+                            
+                            # Check if we're removing all buildings
+                            if group_info['hotel_count'] > 0:
+                                # For hotel, need at least 1 downgrade
+                                can_mortgage = downgrade_count >= 1
+                            else:
+                                # For houses, need enough downgrades to remove all
+                                can_mortgage = downgrade_count >= group_info['house_count']
+                        else:
+                            can_mortgage = False
+                
+                if error := GameValidation.validate_mortgage_property(game_state, self, prop):
+                    can_mortgage = False
+                    
+                if can_mortgage:
+                    mortgage_suggestions.append(prop)
+                    money_raised += prop.mortgage
+        
+        # If we still haven't raised enough, return empty request (bankruptcy)
+        if money_raised < needed_amount:
+            return BankruptcyRequest([], [], [])
+        
+        return BankruptcyRequest(downgrade_suggestions, mortgage_suggestions, [])

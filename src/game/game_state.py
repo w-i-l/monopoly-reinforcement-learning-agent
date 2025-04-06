@@ -9,6 +9,7 @@ from exceptions.exceptions import *
 from models.other_tiles import Jail, Go, GoToJail, FreeParking, Taxes, Chance, CommunityChest
 from models.board import Board
 from game.game_validation import GameValidation
+from game.bankruptcy_request import BankruptcyRequest
 
 # TODO: implement verification for all paths
 
@@ -436,6 +437,27 @@ class GameState:
     def change_turn(self):
         self.current_player_index = (self.current_player_index + 1) % len(self.players)
         self.doubles_rolled = 0
+
+
+    ############## TRADE ACTIONS ##############
+
+    def complete_bankruptcy_request(self, player: Player, bankruptcy_request: BankruptcyRequest):
+        if error := GameValidation.validate_bankruptcy_request(self, player, bankruptcy_request):
+            self.print_debug_info()
+            raise error
+        
+        custom_print(f"{player} completed a bankruptcy request")
+        for group_property in bankruptcy_request.downgrading_suggestions:
+            self.downgrade_property_group(player, group_property)
+
+        for property in bankruptcy_request.mortgaging_suggestions:
+            self.mortgage_property(player, property)
+
+        # trade offers should be fulfilled by trade manager and this list should be empty
+        # for trade_offer in bankruptcy_request.trade_offers:
+        #     self.execute_trade_offer(trade_offer)
+        
+        custom_print(f"{player} completed a bankruptcy request")
         
 
     ############## UTILS METHODS ##############

@@ -8,6 +8,7 @@ from models.railway import Railway
 from models.utility import Utility
 from models.trade_offer import TradeOffer
 from models.tile import Tile
+from game.bankruptcy_request import BankruptcyRequest
 
 if TYPE_CHECKING:
     from game.game_state import GameState
@@ -399,5 +400,37 @@ class GameValidation:
         if isinstance(property, Property):
             if game_state.houses[property.group][0] > 0 or game_state.hotels[property.group][0] > 0:
                 return PropertyHasImprovementsException(str(property))
+            
+        return None
+    
+
+    @staticmethod
+    def validate_bankruptcy_request(game_state: GameState, player: Player, bankruptcy_model: BankruptcyRequest) -> Optional[GameException]:
+        if player not in game_state.players:
+            return PlayerDoesNotExistException(str(player))
+        
+        group_properties_for_houses = []
+        group_properties_for_hotels = []
+
+        for group_property in bankruptcy_model.downgrading_suggestions:
+            if game_state.houses[group_property][0] > 0:
+                group_properties_for_houses.append(group_property)
+            elif game_state.hotels[group_property][0] > 0:
+                group_properties_for_hotels.append(group_property)
+
+        for group_property in group_properties_for_houses:
+            if error := GameValidation.validate_sell_house(game_state, player, group_property):
+                return error
+        for group_property in group_properties_for_hotels:
+            if error := GameValidation.validate_sell_hotel(game_state, player, group_property):
+                return error
+            
+        for property in bankruptcy_model.mortgaging_suggestions:
+            if error := GameValidation.validate_mortgage_property(game_state, player, property):
+                return error
+            
+        for trade_offer in bankruptcy_model.trade_offers:
+            if error := GameValidation.validate_trade_offer(game_state, trade_offer):
+                return error
             
         return None

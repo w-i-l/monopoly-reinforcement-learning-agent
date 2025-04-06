@@ -89,6 +89,8 @@ class PropertyHasNoOwnerException(GameException):
 
 class NotEnoughBalanceException(GameException):
     def __init__(self, price: int, balance: int):
+        self.price = price
+        self.balance = balance
         self.message = f"Not enough balance to complete the transaction. Price: {price}, Balance: {balance}"
         super().__init__(self.message)
 

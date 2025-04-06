@@ -1,10 +1,10 @@
 from models.property import Tile
 from models.property_group import PropertyGroup
 from typing import List, Dict, Optional
+from game.bankruptcy_request import BankruptcyRequest
 
 # TODO: Allow player to upgrade/downgrade any number of times
 # eg. buy 2 houses on one property and 1 house on another, instead of buying one house per call
-
 class Player:
     def __init__(self, name):
         self.name = name
@@ -51,6 +51,10 @@ class Player:
     def get_trade_offers(self, game_state) -> List:
         # TODO: Implement the logic to suggest trade offers
         return []
+    
+    def handle_banckruptcy(self, game_state, amount: int) -> BankruptcyRequest:
+        # TODO: Implement the logic to handle bankruptcy, if a blank model is returned, the player is bankrupt
+        return BankruptcyRequest()
     
     def on_event_received(self, event):
         """
