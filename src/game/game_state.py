@@ -15,7 +15,7 @@ from game.game_validation import GameValidation
 CAN_PRINT = False
 def custom_print(*args, **kwargs):
     if CAN_PRINT:
-        custom_print(*args, **kwargs)
+        print(*args, **kwargs)
 
 class GameState:
     def __init__(self, players: list[Player]):
@@ -44,6 +44,7 @@ class GameState:
     def move_player(self, player: Player, dice: tuple[int, int]):
         if self.in_jail[player]:
             custom_print(f"{player} is in jail")
+            self.print_debug_info()
             raise PlayerInJailException(player)
 
         self.doubles_rolled += 1 if dice[0] == dice[1] else 0
@@ -122,6 +123,7 @@ class GameState:
 
     def buy_property(self, player: Player, property: Tile):
         if error := GameValidation.validate_buy_property(self, player, property):
+            self.print_debug_info()
             raise error
     
         self.properties[player].append(property)
@@ -134,6 +136,7 @@ class GameState:
 
     def mortgage_property(self, player: Player, property: Tile):
         if error := GameValidation.validate_mortgage_property(self, player, property):
+            self.print_debug_info()
             raise error
         
         custom_print(f"{player} mortaging {property}")
@@ -143,6 +146,7 @@ class GameState:
 
     def unmortgage_property(self, player: Player, property: Tile):
         if error := GameValidation.validate_unmortgage_property(self, player, property):
+            self.print_debug_info()
             raise error
         
         custom_print(f"{player} unmortaging {property}")
@@ -161,6 +165,7 @@ class GameState:
 
     def place_house(self, player: Player, property_group: PropertyGroup):
         if error := GameValidation.validate_place_house(self, player, property_group):
+            self.print_debug_info()
             raise error
         
         custom_print(f"{player} placed a house on {property_group}")
@@ -171,6 +176,7 @@ class GameState:
 
     def place_hotel(self, player: Player, property_group: PropertyGroup):
         if error := GameValidation.validate_place_hotel(self, player, property_group):
+            self.print_debug_info()
             raise error
         
         custom_print(f"{player} placed a hotel on {property_group}")
@@ -189,6 +195,7 @@ class GameState:
 
     def sell_house(self, player: Player, property_group: PropertyGroup):
         if error := GameValidation.validate_sell_house(self, player, property_group):
+            self.print_debug_info()
             raise error
         
         custom_print(f"{player} sold a house on {property_group}")
@@ -204,6 +211,7 @@ class GameState:
 
     def sell_hotel(self, player: Player, property_group: PropertyGroup):
         if error := GameValidation.validate_sell_hotel(self, player, property_group):
+            self.print_debug_info()
             raise error
         
         custom_print(f"{player} sold a hotel on {property_group}")
@@ -217,6 +225,7 @@ class GameState:
 
     def send_player_to_jail(self, player: Player):
         if error := GameValidation.validate_send_player_to_jail(self, player):
+            self.print_debug_info()
             raise error
         
         self.in_jail[player] = True
@@ -232,6 +241,7 @@ class GameState:
         '''
 
         if error := GameValidation.validate_get_out_of_jail(self, player):
+            self.print_debug_info()
             raise error
         
         custom_print(f"{player} got out of jail by rolling doubles")
@@ -242,6 +252,7 @@ class GameState:
 
     def receive_get_out_of_jail_card(self, player: Player):
         if error := GameValidation.validate_receive_get_out_of_jail_card(self, player):
+            self.print_debug_info()
             raise error
         
         self.escape_jail_cards[player] += 1
@@ -250,6 +261,7 @@ class GameState:
 
     def use_escape_jail_card(self, player: Player):
         if error := GameValidation.validate_use_escape_jail_card(self, player):
+            self.print_debug_info()
             raise error
         
         custom_print(f"{player} used a Get Out of Jail card")
@@ -261,6 +273,7 @@ class GameState:
 
     def pay_get_out_of_jail_fine(self, player: Player):
         if error := GameValidation.validate_pay_get_out_of_jail_fine(self, player):
+            self.print_debug_info()
             raise error
         
         custom_print(f"{player} paid ${self.board.get_jail_fine()} to get out of jail")
@@ -272,6 +285,7 @@ class GameState:
 
     def count_turn_in_jail(self, player: Player):
         if error := GameValidation.validate_count_turn_in_jail(self, player):
+            self.print_debug_info()
             raise error
         
         custom_print(f"{player} is in jail for {self.turns_in_jail[player]} turns")
@@ -282,6 +296,7 @@ class GameState:
 
     def pay_tax(self, player: Player, tax: int):
         if error := GameValidation.validate_pay_tax(self, player, tax):
+            self.print_debug_info()
             raise error
         
         self.player_balances[player] -= tax
@@ -290,6 +305,7 @@ class GameState:
 
     def pay_players(self, player: Player, amount: int):
         if error := GameValidation.validate_pay_players(self, player, amount):
+            self.print_debug_info()
             raise error
         
         for other_player in self.players:
@@ -315,6 +331,7 @@ class GameState:
             utility_factor_multiplier,
             railway_factor_multiplier
             ):
+            self.print_debug_info()
             raise error
         
         owner = next(p for p in self.properties if property in self.properties[p])
@@ -362,6 +379,7 @@ class GameState:
     
     def receive_from_players(self, player: Player, amount: int):
         if error := GameValidation.validate_receive_from_players(self, player, amount):
+            self.print_debug_info()
             raise error
         
         for other_player in self.players:
@@ -375,6 +393,7 @@ class GameState:
 
     def execute_trade_offer(self, trade_offer: TradeOffer):
         if error := GameValidation.validate_trade_offer(self, trade_offer):
+            self.print_debug_info()
             raise error
         
         source_player = trade_offer.source_player
@@ -460,6 +479,31 @@ class GameState:
             net_worth += self.hotels[group][0] * group.hotel_cost() * number_of_properties
 
         return net_worth
+    
+
+    def configure_debug_mode(self, can_print: bool):
+        self.can_print_debug = can_print
+
+
+    def print_debug_info(self):
+        if not hasattr(self, 'can_print_debug') or not self.can_print_debug:
+            return
+
+        print("\n\n############### DEBUG INFO ###############\n")
+        print("Player positions: ", self.player_positions)
+        print("Player balances: ", self.player_balances)
+        print("Properties: ", self.properties)
+        print("Houses: ", self.houses)
+        print("Hotels: ", self.hotels)
+        print("In jail: ", self.in_jail)
+        print("Escape jail cards: ", self.escape_jail_cards)
+        print("Mortgaged properties: ", self.mortgaged_properties)
+        print("Is owned: ", self.is_owned)
+        print("Doubles rolled: ", self.doubles_rolled)
+        print("Current player: ", self.players[self.current_player_index])
+        print("Current player index: ", self.current_player_index)
+        print("Turn in jail: ", self.turns_in_jail)
+        print("\n##########################################\n\n")
 
 
 if __name__ == "__main__":

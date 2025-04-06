@@ -216,3 +216,18 @@ class NoPropertyNamedException(GameException):
     def __init__(self, property_name: str):
         self.message = f"No property named `{property_name}`"
         super().__init__(self.message)
+
+class NotImplementedHandlerException(GameException):
+    def __init__(self, handler_name: str, *args):
+        if args:
+            args = f"with args: {args}"
+        else:
+            args = ""
+        self.message = f"Handler `{handler_name}` not implemented\n{args}"
+        super().__init__(self.message)
+
+class BankrupcyException(NotImplementedHandlerException):
+    def __init__(self, player_name: str):
+        handler_name = "BankrupcyException"
+        self.message = f"Player `{player_name}` is bankrupt"
+        super().__init__(handler_name, self.message)
