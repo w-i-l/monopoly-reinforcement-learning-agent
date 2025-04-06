@@ -22,6 +22,11 @@ class NotPropertyOwnerException(GameException):
         self.message = f"Player {player_name} does not own property {property_name}"
         super().__init__(self.message)
 
+class PropertyMortagedException(GameException):
+    def __init__(self, property_name: str):
+        self.message = f"Mortgaged property {property_name} cannot be bought"
+        super().__init__(self.message)
+
 class PropertyOwnerPayingRentException(GameException):
     def __init__(self, property_name: str, player_name: str):
         self.message = f"Cannot pay rent to self for property {property_name} owned by {player_name}"
@@ -110,7 +115,7 @@ class PlayerInJailException(GameException):
 class BuildingHousesOfTopOnHotelException(GameException):
     def __init__(self, property_group: str):
         self.message = f"Cannot build houses if there is an hotel already place on {property_group} group"
-        super.__init__(self.message)
+        super().__init__(self.message)
 
 class PropertyNotMortgagedException(GameException):
     def __init__(self, property_name: str):
