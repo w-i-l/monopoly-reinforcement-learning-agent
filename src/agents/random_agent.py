@@ -61,7 +61,7 @@ class RandomAgent(Player):
                 # can t mortgage this property
                 continue
 
-            if should_mortgage:
+            elif should_mortgage:
                 suggestions.append(property)
 
         return suggestions
@@ -81,7 +81,7 @@ class RandomAgent(Player):
                 # can t unmortgage this property
                 continue
 
-            if should_unmortgage:
+            elif should_unmortgage:
                 suggestions.append(property)
 
         return suggestions
@@ -240,9 +240,10 @@ class RandomAgent(Player):
 
                 if error := GameValidation.validate_trade_offer(game_state, trade_offer):
                     # can t make this trade offer
-                    continue
+                    pass
 
-                trade_offers.append(trade_offer)
+                else:
+                    trade_offers.append(trade_offer)
 
         return trade_offers
 
@@ -362,7 +363,6 @@ class RandomAgent(Player):
                             else:
                                 # For houses, need enough downgrades to remove all
                                 can_mortgage = downgrade_count >= group_info['house_count']
-                        else:
                             can_mortgage = False
                 
                 if error := GameValidation.validate_mortgage_property(game_state, self, prop):
