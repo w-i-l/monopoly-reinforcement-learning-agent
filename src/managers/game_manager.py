@@ -496,6 +496,15 @@ class GameManager:
                 for trade_offer in trade_offers:
                     self.__execute_trade(trade_offer)
 
+                # check if the player indeed fulfilled the bankruptcy request
+                if self.game_state.player_balances[current_player] < amount:
+                    # player is bankrupt
+                    self.__declare_player_bankrupt(current_player)
+
+            except NotEnoughBalanceException as e:
+                # player is bankrupt
+                self.__declare_player_bankrupt(current_player)
+
             except Exception as e:
                 # something happened no need to continue
                 ErrorLogger.log_error(e)
