@@ -161,3 +161,6 @@ dist-ssr
 *.sln
 *.sw?
 *.user
+
+# tournaments results
+tournaments_results/
