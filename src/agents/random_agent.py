@@ -331,6 +331,7 @@ class RandomAgent(Player):
                 house_value_per_level = group.house_cost() * info['prop_count'] // 2
                 houses_needed = min(house_count, 
                                     (needed_amount - money_raised + house_value_per_level - 1) // house_value_per_level)
+                houses_needed = int(houses_needed)
                 
                 # Add group multiple times based on how many levels we need to sell
                 for _ in range(houses_needed):
