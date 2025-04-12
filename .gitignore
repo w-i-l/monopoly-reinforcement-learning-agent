@@ -163,4 +163,4 @@ dist-ssr
 *.user
 
 # tournaments results
-tournaments_results/
+tournament_results/
