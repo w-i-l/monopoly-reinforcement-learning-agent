@@ -269,45 +269,46 @@ class GameManager:
 
         # Check if the player landed on an unowned property
         elif current_tile not in self.game_state.is_owned:
-            if current_player.should_buy_property(self.game_state, current_tile):
+            if isinstance(current_tile, Property) or isinstance(current_tile, Railway) or isinstance(current_tile, Utility):
+                if current_player.should_buy_property(self.game_state, current_tile):
 
-                def action_to_perform():
-                    # Process the purchase
-                    self.game_state.buy_property(current_player, current_tile) 
+                    def action_to_perform():
+                        # Process the purchase
+                        self.game_state.buy_property(current_player, current_tile) 
 
-                try:
-                    # Register property purchase event
-                    price = getattr(current_tile, 'price', 0)
+                    try:
+                        # Register property purchase event
+                        price = getattr(current_tile, 'price', 0)
+                        self.event_manager.register_event(
+                            EventType.PROPERTY_PURCHASED,
+                            player=current_player,
+                            tile=current_tile,
+                            amount=price,
+                            description=f"{current_player} purchased {current_tile} for ${price}"
+                        )
+                        
+                        action_to_perform()
+                    
+                    except NotEnoughBalanceException as e:
+                        self.__handle_bankruptcy(current_player, e.price, reason="buying property")
+
+                        # player submitted a bankruptcy request
+                        action_to_perform()
+
+                    except Exception as e:
+                        ErrorLogger.log_error(e)
+                        custom_print("Player does not have enough balance to buy the property")
+                        raise e
+                else:
+                    # TODO: Implement auction logic when player doesn't buy
                     self.event_manager.register_event(
-                        EventType.PROPERTY_PURCHASED,
+                        EventType.AUCTION_STARTED,
                         player=current_player,
                         tile=current_tile,
-                        amount=price,
-                        description=f"{current_player} purchased {current_tile} for ${price}"
+                        description=f"{current_player} chose not to purchase {current_tile}, starting auction"
                     )
-                    
-                    action_to_perform()
-                
-                except NotEnoughBalanceException as e:
-                    self.__handle_bankruptcy(current_player, e.price, reason="buying property")
-
-                    # player submitted a bankruptcy request
-                    action_to_perform()
-
-                except Exception as e:
-                    ErrorLogger.log_error(e)
-                    custom_print("Player does not have enough balance to buy the property")
-                    raise e
-            else:
-                # TODO: Implement auction logic when player doesn't buy
-                self.event_manager.register_event(
-                    EventType.AUCTION_STARTED,
-                    player=current_player,
-                    tile=current_tile,
-                    description=f"{current_player} chose not to purchase {current_tile}, starting auction"
-                )
-                # Placeholder for auction implementation
-                pass
+                    # Placeholder for auction implementation
+                    pass
 
         # Check if the player wants to trade
         trade_offers = current_player.get_trade_offers(self.game_state)
