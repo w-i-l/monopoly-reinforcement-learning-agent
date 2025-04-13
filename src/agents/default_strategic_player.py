@@ -976,7 +976,7 @@ class DefaultStrategicPlayer(Player):
         value_receiving += trade_offer.money_offered
         
         # Value of jail cards we're receiving (approximate)
-        value_receiving += trade_offer.jail_cards_offered * 50
+        value_receiving += (trade_offer.jail_cards_offered or 0) * 50
         
         # Calculate value of what we're giving up
         value_giving = 0
