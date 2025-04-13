@@ -1,5 +1,3 @@
-// This would be an update to components/HumanPlayer/HumanPlayerInterface.jsx
-
 import React, { useState, useEffect } from "react";
 import Alert from "../UI/Alert";
 import { AlertDescription } from "../UI/Alert";
@@ -9,12 +7,16 @@ import PlayerCard from "../Cards/PlayerCard";
 import MonopolyBoard from "../Board/MonopolyBoard";
 import { TradeOfferModal, CreateTradeModal } from "../Modals/TradeOfferModal";
 import EventFeed from "../EventFeed/EventFeed";
+import DiceIcon from "../Dice/Dice";
 
 const HumanPlayerInterface = ({ playerPort = 6060 }) => {
   const [pendingDecision, setPendingDecision] = useState(null);
   const [error, setError] = useState(null);
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [showEventFeed, setShowEventFeed] = useState(true);
+  const [selectedEventType, setSelectedEventType] = useState("All");
+  const [showTradeModal, setShowTradeModal] = useState(false);
+  const [showAcceptTradeModal, setShowAcceptTradeModal] = useState(false);
   const {
     gameState,
     lastRoll,
@@ -22,14 +24,15 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
     currentPlayer,
     error: gameError,
     isLoading,
+    actions,
   } = useGameState();
 
-  // Clear pending decisions when component unmounts
+  // USE Effect to handle showing modal on accept trade
   useEffect(() => {
-    return () => {
-      localStorage.removeItem("pendingDecision");
-    };
-  }, []);
+    if (pendingDecision && pendingDecision.type === "accept_trade") {
+      setShowAcceptTradeModal(true);
+    }
+  }, [pendingDecision]);
 
   // Poll for pending decisions
   useEffect(() => {
@@ -56,7 +59,10 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
     };
 
     const interval = setInterval(checkDecisions, 500);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      localStorage.removeItem("pendingDecision");
+    };
   }, [playerPort]);
 
   // Handle decision submission
@@ -117,12 +123,10 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
   const DecisionCard = ({ title, children, actions }) => (
     <div className="bg-white p-4 rounded-lg shadow-md mb-4">
       <h3 className="text-lg font-bold mb-3">{title}</h3>
-      {(
-        <Button onClick={() => handleDecision([])} className="w-full mb-2">
-          Skip
-        </Button>
-      )}
-      {children}
+      <Button onClick={() => handleDecision([])} className="w-full mb-2">
+        Skip
+      </Button>
+      {children && <div className=" max-h-[30vh] overflow-auto">{children}</div>}
       {actions && <div className="mt-4 space-y-2">{actions}</div>}
     </div>
   );
@@ -137,6 +141,24 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
     </Button>
   );
 
+  const colorMap = {
+    brown: "#845031",
+    light_blue: "#c0e0f9",
+    pink: "#b63785",
+    orange: "#d39423",
+    red: "#c3141b",
+    yellow: "#fdee01",
+    green: "#5aa757",
+    blue: "#1166b0",
+    railway: "#000000",
+    utility: "#000000",
+    unknown: "#cccccc",
+  };
+
+  function capitalizeFirstLetter(val) {
+    return String(val).charAt(0).toUpperCase() + String(val).slice(1);
+  }
+
   // Decision UI renderer
   const renderDecisionUI = () => {
     if (!pendingDecision) return null;
@@ -150,16 +172,30 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
           {renderMoneyInfo({ balance: pendingDecision.data.balance })}
           <div className="mt-4 space-y-4">
             {Object.entries(pendingDecision.data.grouped_properties).map(
-              ([group, props]) => {
+              ([group, groupInfo]) => {
+                const [props, cost] = groupInfo;
                 const isSelected = selectedItems.has(group);
                 return (
                   <div key={group} className="p-3 border rounded-md">
-                    <h4 className="font-medium mb-2">{group}</h4>
+                    <div className="flex items-center justify-center mb-2">
+                      <div
+                        style={{
+                          background: `${colorMap[group]}`,
+                          paddingLeft: "4px",
+                          width: "20px",
+                          height: "20px",
+                        }}
+                      ></div>
+                      <h4 className="font-medium">
+                        {capitalizeFirstLetter(group)}
+                      </h4>
+                    </div>
                     <div className="text-sm mb-3">
                       {props.map((prop, idx) => (
                         <div key={idx}>{prop}</div>
                       ))}
                     </div>
+                    <div className="text-sm mb-3">Upgrade cost: ${cost}</div>
                     <SelectableButton
                       item={group}
                       onClick={() => toggleSelection(group)}
@@ -220,22 +256,38 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
       ),
 
       accept_trade: () => (
-        <TradeOfferModal
-          isOpen={true}
-          onClose={() => handleDecision(false)}
-          tradeOffer={pendingDecision.data}
-          onAccept={() => handleDecision(true)}
-          onReject={() => handleDecision(false)}
-        />
+        <DecisionCard title="Accept Trade?">
+          <div className="text-lg mb-2">
+            {pendingDecision.data.source_player} has offered you a trade:
+          </div>
+          <div className="flex gap-3 mt-4">
+            <Button
+              onClick={() => setShowAcceptTradeModal(true)}
+              className="flex-1"
+            >
+              View Trade
+            </Button>
+            <Button onClick={() => handleDecision(false)} className="flex-1">
+              Reject trade
+            </Button>
+          </div>
+        </DecisionCard>
       ),
 
       create_trade: () => (
-        <CreateTradeModal
-          isOpen={true}
-          onClose={() => handleDecision(null)}
-          tradeData={pendingDecision.data}
-          onSubmit={handleDecision}
-        />
+        <DecisionCard title="Create Trade?">
+          <div className="text-lg mb-2">
+            Would you like to create a trade offer?
+          </div>
+          <div className="flex gap-3 mt-4">
+            <Button onClick={() => setShowTradeModal(true)} className="flex-1">
+              Create Trade
+            </Button>
+            <Button onClick={() => handleDecision([])} className="flex-1">
+              Skip
+            </Button>
+          </div>
+        </DecisionCard>
       ),
 
       pay_jail_fine: () => (
@@ -276,68 +328,107 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
     return decisions[pendingDecision.type]?.() || null;
   };
 
-  // Player cards renderer
-  const renderPlayerCards = () => (
-    <div className="space-y-4">
-      {gameState?.players.map((player, index) => (
-        <PlayerCard
-          key={index}
-          player={player}
-          isCurrentPlayer={index === gameState.currentPlayer}
-        />
-      ))}
-    </div>
-  );
-
-  // Main render
   return (
-    <div className="container mx-auto p-4">
+    <div className="w-full h-screen max-h-screen overflow-hidden flex">
       {(error || gameError) && (
-        <Alert variant="destructive" className="mb-4">
+        <Alert
+          variant="destructive"
+          className="absolute top-0 left-0 right-0 z-50"
+        >
           <AlertDescription>{error || gameError}</AlertDescription>
         </Alert>
       )}
 
-      <div className="flex gap-6">
-        <div className="flex-1">
-          {isLoading ? (
-            <div className="flex justify-center items-center h-96">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+      {/* TRADING MODALS */}
+      {showTradeModal && (
+        // Use the enhanced CreateTradeModal component
+        <CreateTradeModal
+          isOpen={showTradeModal}
+          onClose={() => setShowTradeModal(false)} // Just hide the modal without submitting
+          tradeData={pendingDecision.data}
+          onSubmit={(trades) => {
+            setShowTradeModal(false);
+            handleDecision(trades);
+          }}
+        />
+      )}
+
+      {showAcceptTradeModal && (
+        <TradeOfferModal
+          isOpen={showAcceptTradeModal}
+          onClose={() => {
+            setShowAcceptTradeModal(false);
+          }}
+          tradeOffer={pendingDecision.data}
+          onAccept={() => {
+            handleDecision(true);
+            setShowAcceptTradeModal(false);
+          }}
+          onReject={() => {
+            handleDecision(false);
+            setShowAcceptTradeModal(false);
+          }}
+        />
+      )}
+
+      {/* Players column */}
+      <div className="w-1/4 h-full overflow-auto p-3 flex flex-col space-y-4">
+        {gameState?.players?.map((player, index) => (
+          <PlayerCard
+            key={index}
+            player={player}
+            isCurrentPlayer={index === gameState.currentPlayer}
+          />
+        ))}
+      </div>
+
+      {/* Center column with board */}
+      <div className="w-1/2 h-full flex items-center justify-center relative">
+        {isLoading ? (
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+        ) : (
+          <div className="h-full w-full flex items-start p-3 justify-center">
+            <div className="aspect-square max-h-full max-w-full">
+              <MonopolyBoard />
             </div>
-          ) : (
-            <MonopolyBoard />
-          )}
+          </div>
+        )}
+      </div>
+
+      {/* Right column */}
+      <div className="w-1/4 h-full flex flex-col">
+        {/* Decision UI */}
+        <div className="p-3 overflow-auto">{renderDecisionUI()}</div>
+
+        {/* Action buttons */}
+        <div className="p-3 flex gap-3 border-b border-slate-200">
+          <Button
+            onClick={() => handleDecision([])}
+            disabled={pendingDecision}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2"
+          >
+            Next decision
+          </Button>
+          
+          <Button
+            onClick={() => setShowEventFeed(!showEventFeed)}
+            className="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 font-medium py-2"
+          >
+            {showEventFeed ? "Hide Events" : "Show Events"}
+          </Button>
         </div>
 
-        <div className="w-1/3 space-y-4">
-          {renderDecisionUI()}
-          
-          <div className="mb-4 flex justify-between">
-            <Button
-              onClick={() => handleDecision({ type: "create_trade" })}
-              className="flex-1 mr-2"
-              disabled={!currentPlayer || pendingDecision}
-            >
-              Propose Trade
-            </Button>
-            
-            <Button
-              onClick={() => setShowEventFeed(!showEventFeed)}
-              className="px-3"
-            >
-              {showEventFeed ? "Hide Events" : "Show Events"}
-            </Button>
-          </div>
-          
-          {/* Event Feed toggle */}
-          {showEventFeed && (
-            <div className="mb-4">
-              <EventFeed playerPort={playerPort} />
+        {/* Event feed */}
+        {showEventFeed && (
+          <div className="flex-1 flex flex-col overflow-hidden px-3 pt-2">
+            <div className="flex-1 overflow-auto -mx-3 px-3">
+              <EventFeed
+                playerPort={playerPort}
+                filter={selectedEventType.toLowerCase()}
+              />
             </div>
-          )}
-          
-          {renderPlayerCards()}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

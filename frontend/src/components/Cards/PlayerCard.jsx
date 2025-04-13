@@ -84,7 +84,7 @@ const PropertyItem = ({ property }) => {
         <span className="mr-1">{style.icon}</span>
         <span
           style={{
-            borderLeft: `3px solid ${style.color}`,
+            borderLeft: `15px solid ${style.color}`,
             paddingLeft: "4px",
           }}
         >
@@ -120,7 +120,9 @@ const PlayerCard = ({ player, isCurrentPlayer }) => {
   return (
     <div
       className={`p-3 rounded-lg border ${
-        isCurrentPlayer ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-blue-100" 
+        isCurrentPlayer
+          ? "border-blue-500 bg-blue-50"
+          : "border-gray-200 bg-blue-100"
       }`}
     >
       <div className="flex justify-between items-center mb-2">
@@ -150,16 +152,16 @@ const PlayerCard = ({ player, isCurrentPlayer }) => {
       </div>
 
       <div className="flex flex-wrap gap-1 mb-2">
-        <span className="text-xs bg-purple-100 px-1 py-0.5 rounded-full">
+        <span className="text-xs bg-purple-100 px-3 py-1 rounded-full">
           📍 {position}
         </span>
         {in_jail && (
-          <span className="text-xs bg-red-100 px-1 py-0.5 rounded-full">
+          <span className="text-xs bg-purple-100 px-3 py-1 rounded-full">
             🔒 In Jail
           </span>
         )}
         {escape_jail_cards > 0 && (
-          <span className="text-xs bg-blue-100 px-1 py-0.5 rounded-full">
+          <span className="text-xs bg-purple-100 px-3 py-1 rounded-full">
             🎫 {escape_jail_cards}
           </span>
         )}

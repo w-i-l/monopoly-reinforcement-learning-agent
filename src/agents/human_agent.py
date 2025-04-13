@@ -383,7 +383,8 @@ class HumanAgent(Player):
 
             grouped_properties_copy = deepcopy(grouped_properties)
             for group in grouped_properties_copy:
-                if len(grouped_properties[group]) != len(game_state.board.get_properties_by_group(group)):
+                if len(grouped_properties[group]) != len(game_state.board.get_properties_by_group(group)) or\
+                     game_state.hotels[group][0] > 0:
                     grouped_properties.pop(group)
 
             if not grouped_properties:
@@ -391,7 +392,7 @@ class HumanAgent(Player):
 
             data = {
                 "grouped_properties": {
-                    str(group): [str(p) for p in props]
+                    str(group): ([str(p) for p in props], len(props) * group.house_cost() if game_state.houses[group][0] < 4 else len(props) * group.hotel_cost())
                     for group, props in grouped_properties.items()
                 },
                 "balance": game_state.player_balances[self],
