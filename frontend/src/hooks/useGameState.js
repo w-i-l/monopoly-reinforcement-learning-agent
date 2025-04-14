@@ -22,6 +22,7 @@ const useGameState = () => {
        } else {
           console.log("Game state unchanged");
        }
+       setError(null);
      } catch (error) {
        setError(error.message);
      } finally {
@@ -49,6 +50,7 @@ const useGameState = () => {
         const data = await gameAPI.rollDice();
         setLastRoll(data);
         await fetchGameState();
+        setError(null);
         return data;
       } catch (error) {
         setError(error.message);
@@ -62,6 +64,7 @@ const useGameState = () => {
       try {
         await gameAPI.buyProperty();
         await fetchGameState();
+        setError(null);
       } catch (error) {
         setError(error.message);
         throw error;
@@ -73,6 +76,7 @@ const useGameState = () => {
         await gameAPI.endTurn();
         setLastRoll(null);
         await fetchGameState();
+        setError(null);
       } catch (error) {
         setError(error.message);
         throw error;
@@ -83,6 +87,7 @@ const useGameState = () => {
       try {
         await gameAPI.payRent();
         await fetchGameState();
+        setError(null);
       } catch (error) {
         setError(error.message);
         throw error;
@@ -93,6 +98,7 @@ const useGameState = () => {
       try {
         await gameAPI.mortgageProperty(propertyName);
         await fetchGameState();
+        setError(null);
       } catch (error) {
         setError(error.message);
         throw error;
@@ -103,6 +109,7 @@ const useGameState = () => {
       try {
         await gameAPI.unmortgageProperty(propertyName);
         await fetchGameState();
+        setError(null);
       } catch (error) {
         setError(error.message);
         throw error;
@@ -113,6 +120,7 @@ const useGameState = () => {
       try {
         await gameAPI.placeHouse(propertyName);
         await fetchGameState();
+        setError(null);
       } catch (error) {
         setError(error.message);
         throw error;
@@ -123,6 +131,7 @@ const useGameState = () => {
       try {
         await gameAPI.placeHotel(propertyName);
         await fetchGameState();
+        setError(null);
       } catch (error) {
         setError(error.message);
         throw error;
@@ -133,6 +142,7 @@ const useGameState = () => {
       try {
         await gameAPI.sellHouse(propertyName);
         await fetchGameState();
+        setError(null);
       } catch (error) {
         setError(error.message);
         throw error;
@@ -143,6 +153,7 @@ const useGameState = () => {
       try {
         await gameAPI.sellHotel(propertyName);
         await fetchGameState();
+        setError(null);
       } catch (error) {
         setError(error.message);
         throw error;
@@ -153,6 +164,7 @@ const useGameState = () => {
       try {
         const cardData = await gameAPI.drawCard(cardType);
         await fetchGameState();
+        setError(null);
         return cardData;
       } catch (error) {
         setError(error.message);
@@ -164,6 +176,7 @@ const useGameState = () => {
       try {
         await gameAPI.proposeTrade(tradeDetails);
         await fetchGameState();
+        setError(null);
       } catch (error) {
         setError(error.message);
         throw error;
@@ -174,6 +187,7 @@ const useGameState = () => {
       try {
         await gameAPI.respondToTrade(tradeId, accept);
         await fetchGameState();
+        setError(null);
       } catch (error) {
         setError(error.message);
         throw error;
