@@ -106,187 +106,311 @@ const EventFeed = ({ playerPort = 6060 }) => {
     return true;
   });
 
-  // Get color for event type
-  const getEventColor = (type) => {
-    if (["PLAYER_MOVED", "PLAYER_GOT_OUT_OF_JAIL"].includes(type))
-      return "bg-blue-50 border-blue-200";
-    if (["DICE_ROLLED", "DOUBLES_ROLLED"].includes(type))
-      return "bg-gray-50 border-gray-200";
-    if (["PLAYER_PASSED_GO", "MONEY_RECEIVED"].includes(type))
-      return "bg-green-50 border-green-200";
-    if (["PROPERTY_PURCHASED", "HOUSE_BUILT", "HOTEL_BUILT"].includes(type))
-      return "bg-indigo-50 border-indigo-200";
-    if (
-      ["MONEY_PAID", "RENT_PAID", "TAX_PAID", "PLAYER_WENT_TO_JAIL"].includes(
-        type
-      )
-    )
-      return "bg-red-50 border-red-200";
-    if (["PROPERTY_MORTGAGED", "HOUSE_SOLD", "HOTEL_SOLD"].includes(type))
-      return "bg-orange-50 border-orange-200";
-    if (["PROPERTY_UNMORTGAGED"].includes(type))
-      return "bg-emerald-50 border-emerald-200";
-    if (["CHANCE_CARD_DRAWN", "COMMUNITY_CHEST_CARD_DRAWN"].includes(type))
-      return "bg-yellow-50 border-yellow-200";
-    if (
-      ["GET_OUT_OF_JAIL_CARD_RECEIVED", "GET_OUT_OF_JAIL_CARD_USED"].includes(
-        type
-      )
-    )
-      return "bg-purple-50 border-purple-200";
-    return "bg-gray-50 border-gray-200";
-  };
+  // Get event style based on type
+  const getEventStyle = (type) => {
+    const styles = {
+      // Movement related
+      PLAYER_MOVED: {
+        bg: "bg-blue-100",
+        border: "border-blue-200",
+        icon: "🚶",
+        iconBg: "bg-blue-200",
+      },
+      PLAYER_PASSED_GO: {
+        bg: "bg-green-100",
+        border: "border-green-200",
+        icon: "💰",
+        iconBg: "bg-green-200",
+      },
+      PLAYER_WENT_TO_JAIL: {
+        bg: "bg-red-100",
+        border: "border-red-200",
+        icon: "🔒",
+        iconBg: "bg-red-200",
+      },
+      PLAYER_GOT_OUT_OF_JAIL: {
+        bg: "bg-blue-100",
+        border: "border-blue-200",
+        icon: "🔓",
+        iconBg: "bg-blue-200",
+      },
 
-  // Get icon for event type
-  const getEventIcon = (type) => {
-    const icons = {
-      PLAYER_MOVED: "🚶",
-      PLAYER_PASSED_GO: "💰",
-      PROPERTY_PURCHASED: "🏠",
-      DICE_ROLLED: "🎲",
-      DOUBLES_ROLLED: "🎯",
-      MONEY_RECEIVED: "💵",
-      MONEY_PAID: "💸",
-      RENT_PAID: "💰",
-      TAX_PAID: "📝",
-      PLAYER_WENT_TO_JAIL: "🔒",
-      PLAYER_GOT_OUT_OF_JAIL: "🔓",
-      CHANCE_CARD_DRAWN: "❓",
-      COMMUNITY_CHEST_CARD_DRAWN: "📦",
-      PROPERTY_MORTGAGED: "📝",
-      PROPERTY_UNMORTGAGED: "📄",
-      HOUSE_BUILT: "🏠",
-      HOTEL_BUILT: "🏨",
-      HOUSE_SOLD: "🏚️",
-      HOTEL_SOLD: "🏚️",
-      GET_OUT_OF_JAIL_CARD_RECEIVED: "🎫",
-      GET_OUT_OF_JAIL_CARD_USED: "🎟️",
-      TRADE_OFFERED: "🤝",
-      TRADE_ACCEPTED: "✅",
-      TRADE_REJECTED: "❌",
-      TURN_STARTED: "▶️",
-      TURN_ENDED: "⏹️",
+      // Dice related
+      DICE_ROLLED: {
+        bg: "bg-gray-100",
+        border: "border-gray-300",
+        icon: "🎲",
+        iconBg: "bg-gray-200",
+      },
+      DOUBLES_ROLLED: {
+        bg: "bg-purple-100",
+        border: "border-purple-200",
+        icon: "🎯",
+        iconBg: "bg-purple-200",
+      },
+
+      // Money related
+      MONEY_RECEIVED: {
+        bg: "bg-green-100",
+        border: "border-green-200",
+        icon: "💵",
+        iconBg: "bg-green-200",
+      },
+      MONEY_PAID: {
+        bg: "bg-red-100",
+        border: "border-red-200",
+        icon: "💸",
+        iconBg: "bg-red-200",
+      },
+      RENT_PAID: {
+        bg: "bg-red-100",
+        border: "border-red-200",
+        icon: "💰",
+        iconBg: "bg-red-200",
+      },
+      TAX_PAID: {
+        bg: "bg-red-100",
+        border: "border-red-200",
+        icon: "📝",
+        iconBg: "bg-red-200",
+      },
+
+      // Property related
+      PROPERTY_PURCHASED: {
+        bg: "bg-indigo-100",
+        border: "border-indigo-200",
+        icon: "🏠",
+        iconBg: "bg-indigo-200",
+      },
+      PROPERTY_MORTGAGED: {
+        bg: "bg-orange-100",
+        border: "border-orange-200",
+        icon: "📝",
+        iconBg: "bg-orange-200",
+      },
+      PROPERTY_UNMORTGAGED: {
+        bg: "bg-emerald-100",
+        border: "border-emerald-200",
+        icon: "📄",
+        iconBg: "bg-emerald-200",
+      },
+      HOUSE_BUILT: {
+        bg: "bg-indigo-100",
+        border: "border-indigo-200",
+        icon: "🏠",
+        iconBg: "bg-indigo-200",
+      },
+      HOTEL_BUILT: {
+        bg: "bg-indigo-100",
+        border: "border-indigo-200",
+        icon: "🏨",
+        iconBg: "bg-indigo-200",
+      },
+      HOUSE_SOLD: {
+        bg: "bg-orange-100",
+        border: "border-orange-200",
+        icon: "🏚️",
+        iconBg: "bg-orange-200",
+      },
+      HOTEL_SOLD: {
+        bg: "bg-orange-100",
+        border: "border-orange-200",
+        icon: "🏚️",
+        iconBg: "bg-orange-200",
+      },
+
+      // Card related
+      CHANCE_CARD_DRAWN: {
+        bg: "bg-yellow-100",
+        border: "border-yellow-200",
+        icon: "❓",
+        iconBg: "bg-yellow-200",
+      },
+      COMMUNITY_CHEST_CARD_DRAWN: {
+        bg: "bg-yellow-100",
+        border: "border-yellow-200",
+        icon: "📦",
+        iconBg: "bg-yellow-200",
+      },
+      GET_OUT_OF_JAIL_CARD_RECEIVED: {
+        bg: "bg-purple-100",
+        border: "border-purple-200",
+        icon: "🎫",
+        iconBg: "bg-purple-200",
+      },
+      GET_OUT_OF_JAIL_CARD_USED: {
+        bg: "bg-purple-100",
+        border: "border-purple-200",
+        icon: "🎟️",
+        iconBg: "bg-purple-200",
+      },
+
+      // Trade related
+      TRADE_OFFERED: {
+        bg: "bg-blue-100",
+        border: "border-blue-200",
+        icon: "🤝",
+        iconBg: "bg-blue-200",
+      },
+      TRADE_ACCEPTED: {
+        bg: "bg-green-100",
+        border: "border-green-200",
+        icon: "✅",
+        iconBg: "bg-green-200",
+      },
+      TRADE_REJECTED: {
+        bg: "bg-red-100",
+        border: "border-red-200",
+        icon: "❌",
+        iconBg: "bg-red-200",
+      },
+
+      // Turn related
+      TURN_STARTED: {
+        bg: "bg-blue-100",
+        border: "border-blue-200",
+        icon: "▶️",
+        iconBg: "bg-blue-200",
+      },
+      TURN_ENDED: {
+        bg: "bg-gray-100",
+        border: "border-gray-200",
+        icon: "⏹️",
+        iconBg: "bg-gray-200",
+      },
+
+      // Default
+      DEFAULT: {
+        bg: "bg-gray-100",
+        border: "border-gray-200",
+        icon: "📝",
+        iconBg: "bg-gray-200",
+      },
     };
 
-    return icons[type] || "📝";
+    return styles[type] || styles.DEFAULT;
   };
 
+  // Tab button for filters
+  const FilterTab = ({ label, value }) => (
+    <button
+      onClick={() => setFilter(value)}
+      className={`
+        px-3 py-1.5 text-xs font-medium rounded-md transition-all
+        ${
+          filter === value
+            ? "bg-white text-blue-700 shadow-sm border border-blue-200"
+            : "text-gray-600 bg-gray-100 hover:bg-gray-200"
+        }
+      `}
+    >
+      {label}
+    </button>
+  );
+
   return (
-    <div className="bg-white shadow-lg rounded-lg overflow-hidden">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-4 py-3">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold text-white">Game Events</h2>
-          <div className="flex space-x-1">
-            <button
-              onClick={() => setFilter("all")}
-              className={`px-2 py-1 text-xs rounded-md ${
-                filter === "all"
-                  ? "bg-white text-blue-800"
-                  : "bg-blue-700 text-blue-100"
-              }`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setFilter("money")}
-              className={`px-2 py-1 text-xs rounded-md ${
-                filter === "money"
-                  ? "bg-white text-blue-800"
-                  : "bg-blue-700 text-blue-100"
-              }`}
-            >
-              Money
-            </button>
-            <button
-              onClick={() => setFilter("property")}
-              className={`px-2 py-1 text-xs rounded-md ${
-                filter === "property"
-                  ? "bg-white text-blue-800"
-                  : "bg-blue-700 text-blue-100"
-              }`}
-            >
-              Property
-            </button>
-            <button
-              onClick={() => setFilter("movement")}
-              className={`px-2 py-1 text-xs rounded-md ${
-                filter === "movement"
-                  ? "bg-white text-blue-800"
-                  : "bg-blue-700 text-blue-100"
-              }`}
-            >
-              Movement
-            </button>
+    <div className="bg-white rounded-xl border border-gray-200 shadow-md overflow-hidden flex flex-col h-full">
+      {/* Fixed Header */}
+      <div className="bg-white border-b border-gray-200 px-4 py-3 flex-shrink-0">
+        <div className="flex flex-col gap-2">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-bold text-gray-800">Game Events</h2>
+            <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
+              {filteredEvents.length} events
+            </span>
+          </div>
+          <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg justify-center">
+            <FilterTab label="All" value="all" />
+            <FilterTab label="Money" value="money" />
+            <FilterTab label="Property" value="property" />
+            <FilterTab label="Movement" value="movement" />
           </div>
         </div>
       </div>
 
+      {/* Error Message (if any) */}
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+        <div className="bg-red-100 border border-red-400 text-red-700 mx-2 my-1 px-4 py-3 rounded-md flex-shrink-0">
           Error: {error}
         </div>
       )}
 
+      {/* Scrollable Event List */}
       <div
         ref={eventContainerRef}
-        className="overflow-y-auto max-h-80 py-1 px-2 divide-y divide-gray-100"
+        className="overflow-y-auto flex-grow"
+        style={{ scrollbarWidth: "thin" }}
       >
         {filteredEvents.length === 0 ? (
-          <div className="text-gray-500 italic text-center py-6">
-            No events yet. Game events will appear here.
+          <div className="text-gray-500 italic text-center p-8 h-full flex items-center justify-center">
+            <p>No events yet. Game events will appear here.</p>
           </div>
         ) : (
-          filteredEvents.map((event) => (
-            <div
-              key={event.id}
-              className={`p-3 my-1 rounded-md border ${getEventColor(
-                event.type
-              )}`}
-            >
-              <div className="flex items-start gap-3">
-                <span className="text-2xl">{getEventIcon(event.type)}</span>
-                <div className="flex-grow">
-                  <p
-                    className={`text-sm ${
-                      event.player && event.player.includes("Strategic")
-                        ? "text-red-800"
-                        : "text-gray-800"
-                    }`}
-                  >
-                    {event.description}
-                    {event.amount && !event.description.includes("$") && (
-                      <span className="font-semibold"> (${event.amount})</span>
-                    )}
-                  </p>
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <div className="flex items-center">
-                      <span
-                        className={`w-2 h-2 rounded-full mr-1 ${
-                          event.player && event.player.includes("Strategic")
-                            ? "bg-red-600"
-                            : "bg-blue-600"
-                        }`}
-                      ></span>
-                      <span>{event.player}</span>
+          <div className="divide-y divide-gray-100">
+            {filteredEvents.map((event) => {
+              const style = getEventStyle(event.type);
+              return (
+                <div
+                  key={event.id}
+                  className={`p-4 ${style.bg} border-l-4 ${style.border} hover:bg-opacity-90 transition-colors`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`flex-shrink-0 w-10 h-10 rounded-full ${style.iconBg} flex items-center justify-center text-xl`}
+                    >
+                      {style.icon}
                     </div>
-                    <div className="opacity-70">{event.timestamp}</div>
+                    <div className="flex-grow">
+                      <p
+                        className={`text-sm font-medium ${
+                          event.player && event.player.includes("Strategic")
+                            ? "text-red-700"
+                            : "text-gray-800"
+                        }`}
+                      >
+                        {event.description}
+                        {event.amount && !event.description.includes("$") && (
+                          <span className="font-bold text-gray-900">
+                            {" "}
+                            (${event.amount})
+                          </span>
+                        )}
+                      </p>
+                      <div className="flex justify-between text-xs mt-1">
+                        <div className="flex items-center">
+                          <span
+                            className={`w-2 h-2 rounded-full mr-1 ${
+                              event.player && event.player.includes("Strategic")
+                                ? "bg-red-500"
+                                : "bg-blue-500"
+                            }`}
+                          ></span>
+                          <span className="font-medium text-gray-600">
+                            {event.player}
+                          </span>
+                        </div>
+                        <div className="text-gray-500 font-mono">
+                          {event.timestamp}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          ))
+              );
+            })}
+          </div>
         )}
       </div>
 
-      <div className="border-t border-gray-200 p-2 flex justify-between items-center bg-gray-50">
+      {/* Fixed Footer */}
+      <div className="border-t border-gray-200 p-3 flex justify-between items-center bg-white flex-shrink-0">
         <span className="text-xs text-gray-500">
-          {filteredEvents.length} events
+          {events.length} total events
         </span>
         {events.length > 0 && (
           <button
-            onClick={clearAllEvents}x
-            className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm font-medium text-gray-700"
+            onClick={clearAllEvents}
+            className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-100 rounded-md text-sm font-medium text-gray-700 shadow-sm transition-colors"
           >
             Clear All
           </button>
