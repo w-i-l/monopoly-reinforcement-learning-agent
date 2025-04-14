@@ -61,7 +61,7 @@ const PropertyItem = ({ property }) => {
       green: "#5aa757",
       blue: "#1166b0",
       railway: "#000000",
-      utility: "#000000",
+      utility: "#444444",
       unknown: "#cccccc",
     };
 
@@ -79,19 +79,33 @@ const PropertyItem = ({ property }) => {
   const style = getPropertyStyle();
 
   return (
-    <div className="flex items-center justify-between p-1 bg-gray-50 rounded text-xs">
-      <div className="flex items-center">
-        <span className="mr-1">{style.icon}</span>
-        <span
-          style={{
-            borderLeft: `15px solid ${style.color}`,
-            paddingLeft: "4px",
-          }}
-        >
-          {property.name}
-        </span>
-      </div>
+    <div className="flex items-center p-1.5 bg-white rounded-md border border-gray-200 shadow-sm transition-all hover:bg-gray-50">
+      <div
+        className="w-3 h-3 rounded-full mr-1.5 flex-shrink-0"
+        style={{ backgroundColor: style.color }}
+      ></div>
+      <span className="text-gray-700 truncate text-xs">{property.name}</span>
     </div>
+  );
+};
+
+// Badge component for player stats and status
+const Badge = ({ children, color = "gray" }) => {
+  const colorClasses = {
+    gray: "bg-gray-100 text-gray-700 border-gray-200",
+    blue: "bg-blue-100 text-blue-700 border-blue-200",
+    red: "bg-red-100 text-red-700 border-red-200",
+    green: "bg-green-100 text-green-700 border-green-200",
+    purple: "bg-purple-100 text-purple-700 border-purple-200",
+    yellow: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  };
+
+  return (
+    <span
+      className={`px-2 py-0.5 rounded-md text-xs font-medium border ${colorClasses[color]}`}
+    >
+      {children}
+    </span>
   );
 };
 
@@ -117,62 +131,89 @@ const PlayerCard = ({ player, isCurrentPlayer }) => {
     0
   );
 
+  // Extract first letter of name for avatar
+  const initial = name.charAt(0).toUpperCase();
+
   return (
     <div
-      className={`p-3 rounded-lg border ${
-        isCurrentPlayer
-          ? "border-blue-500 bg-blue-50"
-          : "border-gray-200 bg-blue-100"
-      }`}
+      className={`
+        rounded-xl p-4 transition-all
+        ${
+          isCurrentPlayer
+            ? "bg-white border-2 border-blue-300 shadow-md"
+            : "bg-gray-50 border border-gray-200 shadow-sm hover:bg-white"
+        }
+      `}
     >
-      <div className="flex justify-between items-center mb-2">
-        <h3 className={`font-bold ${isCurrentPlayer ? "text-blue-700" : ""}`}>
-          {name}
-        </h3>
+      {/* Player header */}
+      <div className="flex justify-between items-center mb-3">
+        <div className="flex items-center">
+          <div
+            className={`w-8 h-8 rounded-full flex items-center justify-center mr-2 ${
+              isCurrentPlayer
+                ? "bg-blue-500 text-white"
+                : "bg-gray-300 text-gray-700"
+            }`}
+          >
+            {initial}
+          </div>
+          <h3
+            className={`font-bold ${
+              isCurrentPlayer ? "text-blue-700" : "text-gray-800"
+            }`}
+          >
+            {name}
+          </h3>
+        </div>
         {isCurrentPlayer && (
-          <span className="text-xs px-2 py-0.5 bg-yellow-400 rounded-full">
+          <div className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium border border-yellow-200">
             Current
-          </span>
+          </div>
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-1 text-center text-sm mb-2">
-        <div>
-          <div className="font-semibold text-blue-600">${balance}</div>
+      {/* Player stats */}
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <div className="bg-white rounded-lg p-2 text-center border border-gray-200 shadow-sm">
+          <div className="font-bold text-blue-600">${balance}</div>
           <div className="text-xs text-gray-500">Balance</div>
         </div>
-        <div>
-          <div className="font-semibold text-green-600">{totalHouses}</div>
+        <div className="bg-white rounded-lg p-2 text-center border border-gray-200 shadow-sm">
+          <div className="font-bold text-green-600">{totalHouses}</div>
           <div className="text-xs text-gray-500">Houses</div>
         </div>
-        <div>
-          <div className="font-semibold text-red-600">{totalHotels}</div>
+        <div className="bg-white rounded-lg p-2 text-center border border-gray-200 shadow-sm">
+          <div className="font-bold text-red-600">{totalHotels}</div>
           <div className="text-xs text-gray-500">Hotels</div>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1 mb-2">
-        <span className="text-xs bg-purple-100 px-3 py-1 rounded-full">
-          📍 {position}
-        </span>
-        {in_jail && (
-          <span className="text-xs bg-purple-100 px-3 py-1 rounded-full">
-            🔒 In Jail
-          </span>
-        )}
+      {/* Player status badges */}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        <Badge color="blue">📍 Position {position}</Badge>
+        {in_jail && <Badge color="red">🔒 In Jail</Badge>}
         {escape_jail_cards > 0 && (
-          <span className="text-xs bg-purple-100 px-3 py-1 rounded-full">
-            🎫 {escape_jail_cards}
-          </span>
+          <Badge color="purple">
+            🎫 {escape_jail_cards} Card{escape_jail_cards > 1 ? "s" : ""}
+          </Badge>
         )}
       </div>
 
-      <div className="text-xs">
-        <div className="font-semibold mb-1">Properties:</div>
+      {/* Properties section */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-sm font-semibold text-gray-700">Properties</h4>
+          <span className="text-xs text-gray-500">
+            {properties.length} owned
+          </span>
+        </div>
+
         {properties.length === 0 ? (
-          <div className="text-gray-500 italic">No properties owned</div>
+          <div className="text-gray-500 italic text-xs bg-white rounded-md p-2 text-center border border-gray-200">
+            No properties owned
+          </div>
         ) : (
-          <div className="grid grid-cols-2 gap-1">
+          <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1 pb-1">
             {properties.map((prop, i) => (
               <PropertyItem key={i} property={prop} />
             ))}
