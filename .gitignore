@@ -164,3 +164,7 @@ dist-ssr
 
 # tournaments results
 tournament_results/
+saved_models/
+trained_models/
+training_logs/
+default_strategic_agents_search/
