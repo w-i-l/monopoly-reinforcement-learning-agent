@@ -12,6 +12,7 @@ from collections import defaultdict
 from tqdm import tqdm
 import seaborn as sns
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from copy import deepcopy
 
 from game.player import Player
 from managers.game_manager import GameManager
@@ -56,7 +57,8 @@ class TournamentManager:
             parallel: bool = False,
             num_workers: int = None,
             collect_turn_data: bool = True,
-            save_event_log: bool = False
+            save_event_log: bool = False,
+            excluded_parallel_players: List[Player] = None  # New parameter
         ) -> Dict[str, Any]:
         """
         Run a tournament with the specified players.
@@ -69,12 +71,20 @@ class TournamentManager:
             num_workers: Number of parallel workers (defaults to CPU count if None)
             collect_turn_data: Whether to collect detailed per-turn data (may slow down simulation)
             save_event_log: Whether to save the full event log (can generate large files)
-            
+            excluded_parallel_players: List of players that should be processed sequentially
+                
         Returns:
             Dictionary containing tournament results and statistics
         """
+        # Initialize excluded_parallel_players if not provided
+        if excluded_parallel_players is None:
+            excluded_parallel_players = []
+            
         print(f"Starting tournament with {len(players)} players: {[p.name for p in players]}")
         print(f"Running {num_games} games with max {max_turns} turns per game")
+        
+        # Check if we have excluded players
+        has_excluded_players = bool(excluded_parallel_players) and any(player in excluded_parallel_players for player in players)
         
         # Create a timestamp for this tournament
         timestamp = int(time.time())
@@ -95,13 +105,46 @@ class TournamentManager:
             "errors": 0  # New: Track total number of errors
         }
         
-        if parallel and num_games > 1:
-            # Run games in parallel
+        # For hybrid mode (some players excluded from parallel processing)
+        if parallel and has_excluded_players:
+            print(f"Running in hybrid mode: Some players will be processed sequentially, others in parallel")
+            
+            # Calculate how many games to run in parallel vs sequentially
+            # For simplicity, let's use a 70-30 split, adjusted later based on results
+            parallel_games = int(num_games * 0.7)
+            sequential_games = num_games - parallel_games
+            
+            # Run games in parallel first (without excluded players)
+            print(f"Running {parallel_games} games in parallel mode...")
+            parallel_results = self._run_games_parallel(
+                [p for p in players if p not in excluded_parallel_players], 
+                parallel_games, 
+                max_turns, 
+                collect_turn_data, 
+                save_event_log, 
+                num_workers
+            )
+            
+            # Run games with excluded players sequentially
+            print(f"Running {sequential_games} games with excluded players sequentially...")
+            sequential_results = self._run_games_sequential(
+                players,  # Use all players
+                sequential_games, 
+                max_turns, 
+                collect_turn_data, 
+                save_event_log
+            )
+            
+            # Combine results
+            game_results = parallel_results + sequential_results
+            
+        elif parallel and not has_excluded_players:
+            # Run all games in parallel (no excluded players)
             game_results = self._run_games_parallel(
                 players, num_games, max_turns, collect_turn_data, save_event_log, num_workers
             )
         else:
-            # Run games sequentially
+            # Run all games sequentially
             game_results = self._run_games_sequential(
                 players, num_games, max_turns, collect_turn_data, save_event_log
             )
@@ -139,7 +182,8 @@ class TournamentManager:
             parallel: bool = False,
             num_workers: int = None,
             collect_turn_data: bool = False,
-            save_event_log: bool = False
+            save_event_log: bool = False,
+            excluded_parallel_players: List[Player] = None  # New parameter
         ) -> Dict[str, Any]:
         """
         Run a round-robin tournament with 2-player games for all combinations of players.
@@ -152,10 +196,15 @@ class TournamentManager:
             num_workers: Number of parallel workers (defaults to CPU count if None)
             collect_turn_data: Whether to collect detailed per-turn data
             save_event_log: Whether to save the full event log
-            
+            excluded_parallel_players: List of players that should be processed sequentially
+                
         Returns:
             Dictionary containing tournament results and statistics
         """
+        # Initialize excluded_parallel_players if not provided
+        if excluded_parallel_players is None:
+            excluded_parallel_players = []
+            
         player_names = [p.name for p in players]
         player_types = [type(p).__name__ for p in players]
         num_players = len(players)
@@ -189,14 +238,48 @@ class TournamentManager:
         # Generate all unique player pairings
         matchups = list(itertools.combinations(range(num_players), 2))
         
-        if parallel and total_games > 1:
-            # Run games in parallel
-            game_results = self._run_2player_games_parallel(
-                players, matchups, games_per_matchup, max_turns, 
+        # Split matchups into those that involve excluded players and those that don't
+        excluded_matchups = []
+        parallel_matchups = []
+        
+        for matchup in matchups:
+            player1_idx, player2_idx = matchup
+            player1 = players[player1_idx]
+            player2 = players[player2_idx]
+            
+            # If either player is in the excluded list, add to excluded_matchups
+            if player1 in excluded_parallel_players or player2 in excluded_parallel_players:
+                excluded_matchups.append(matchup)
+            else:
+                parallel_matchups.append(matchup)
+
+        # Process matchups
+        game_results = []
+        
+        if parallel and parallel_matchups and len(parallel_matchups) < len(matchups):
+            print(f"Running in hybrid mode: {len(excluded_matchups)}/{len(matchups)} matchups sequentially, {len(parallel_matchups)}/{len(matchups)} in parallel")
+        
+        if parallel and parallel_matchups:
+            # Run parallel matchups in parallel
+            print(f"Running {len(parallel_matchups)} matchups in parallel mode...")
+            parallel_results = self._run_2player_games_parallel(
+                players, parallel_matchups, games_per_matchup, max_turns, 
                 collect_turn_data, save_event_log, num_workers
             )
-        else:
-            # Run games sequentially
+            game_results.extend(parallel_results)
+        
+        # Run excluded matchups sequentially
+        if excluded_matchups:
+            if parallel and parallel_matchups:
+                print(f"Processing remaining {len(excluded_matchups)} matchups with excluded players sequentially...")
+            
+            sequential_results = self._run_2player_games_sequential(
+                players, excluded_matchups, games_per_matchup, max_turns,
+                collect_turn_data, save_event_log
+            )
+            game_results.extend(sequential_results)
+        elif not parallel or not parallel_matchups:
+            # Run all games sequentially if parallel is False or no parallel matchups
             game_results = self._run_2player_games_sequential(
                 players, matchups, games_per_matchup, max_turns,
                 collect_turn_data, save_event_log
@@ -265,6 +348,60 @@ class TournamentManager:
             
         return game_results
     
+    def _create_clean_player_instance(self, original_player: Player, game_suffix=""):
+        """
+        Create a clean instance of a player for tournament games.
+        
+        Args:
+            original_player: The original player instance
+            game_suffix: Suffix to add to player name for uniqueness
+            
+        Returns:
+            Clean player instance ready for tournament
+        """
+        # if not original_player.can_be_referenced:
+        #     # Create new instance normally
+        #     return type(original_player)(f"{original_player.name}{game_suffix}")
+        # else:
+        # For DQN agents that can be referenced, we need special handling
+        if original_player.can_be_referenced:  # It's a DQN agent
+            # Create a clean DQN instance for evaluation
+            clean_agent = type(original_player)(
+                f"{original_player.name}{game_suffix}",
+                training=False,  # Force evaluation mode
+                dqn_methods=original_player.dqn_methods.copy(),
+                can_use_defaults_methods=original_player.can_use_defaults_methods.copy()
+            )
+            
+            # Copy the trained networks but reset other state
+            for method in original_player.q_networks:
+                if method in clean_agent.q_networks:
+                    # Copy network weights
+                    clean_agent.q_networks[method].set_weights(
+                        original_player.q_networks[method].get_weights()
+                    )
+                    clean_agent.target_networks[method].set_weights(
+                        original_player.target_networks[method].get_weights()
+                    )
+            
+            # Reset agent state for clean evaluation
+            clean_agent.epsilon = 0.05  # Low epsilon for evaluation
+            clean_agent.training = False
+            clean_agent.current_decisions = {
+                method: None for method in clean_agent.q_networks
+            }
+
+
+            # Clear memory - we don't want training data during tournaments
+            for method in clean_agent.memory:
+                clean_agent.memory[method].clear()
+            
+            return clean_agent
+        else:
+            # For other referenceable agents, just return the original
+            # (assuming they don't have problematic state)
+            return original_player
+    
     def _run_2player_games_sequential(
             self, 
             players: List[Player], 
@@ -291,31 +428,71 @@ class TournamentManager:
         game_results = []
         game_idx = 0
         
-        # Run games for each matchup
-        for player1_idx, player2_idx in tqdm(matchups, desc="Running matchups"):
-            for _ in range(games_per_matchup):
-                # Create copies of players to avoid state contamination between games
-                player1 = type(players[player1_idx])(players[player1_idx].name)
-                player2 = type(players[player2_idx])(players[player2_idx].name)
-                
-                # Randomly decide player order for fairness
-                if random.random() < 0.5:
-                    game_players = [player1, player2]
-                else:
-                    game_players = [player2, player1]
-                
-                # Run the game and get results
-                game_result = self._run_single_game(
-                    game_players, game_idx, max_turns, collect_turn_data, save_event_log
-                )
-                
-                # Add matchup information to the result
-                game_result["matchup"] = (players[player1_idx].name, players[player2_idx].name)
-                
-                game_results.append(game_result)
-                game_idx += 1
-            
+        # Calculate total number of games to track progress
+        total_games = len(matchups) * games_per_matchup
+        processed_games = 0
+        
+        # Create progress bar for the total games instead of matchups
+        with tqdm(total=total_games, desc="Running sequential games") as pbar:
+            # Run games for each matchup
+            for player1_idx, player2_idx in matchups:
+                for _ in range(games_per_matchup):
+                    # Store original player names for mapping
+                    original_player1_name = players[player1_idx].name
+                    original_player2_name = players[player2_idx].name
+                    
+                    # Create copies of players to avoid state contamination between games
+                    # if not players[player1_idx].can_be_referenced:
+                    #     player1 = type(players[player1_idx])(players[player1_idx].name)
+                    # else:
+                    #     player1 = players[player1_idx]
+
+                    # if not players[player2_idx].can_be_referenced:
+                    #     player2 = type(players[player2_idx])(players[player2_idx].name)
+                    # else:
+                    #     player2 = players[player2_idx]
+
+                    player1 = self._create_clean_player_instance(
+                        players[player1_idx], 
+                        f"_g{game_idx}"
+                    )
+                    player2 = self._create_clean_player_instance(
+                        players[player2_idx], 
+                        f"_g{game_idx}"
+                    )
+                    
+                    # Randomly decide player order for fairness
+                    if random.random() < 0.5:
+                        game_players = [player1, player2]
+                    else:
+                        game_players = [player2, player1]
+                    
+                    # Create name mapping dictionary
+                    name_mapping = {
+                        player1.name: original_player1_name,
+                        player2.name: original_player2_name
+                    }
+                    
+                    # Run the game and get results
+                    game_result = self._run_single_game(
+                        game_players, game_idx, max_turns, collect_turn_data, save_event_log
+                    )
+                    
+                    # Add matchup information to the result
+                    game_result["matchup"] = (original_player1_name, original_player2_name)
+                    
+                    # Add name mapping to result for statistics processing
+                    game_result["name_mapping"] = name_mapping
+                    
+                    game_results.append(game_result)
+                    game_idx += 1
+                    
+                    # Update progress
+                    processed_games += 1
+                    pbar.update(1)
+        
         return game_results
+
     
     def _run_games_parallel(
             self, 
@@ -336,7 +513,7 @@ class TournamentManager:
             collect_turn_data: Whether to collect detailed per-turn data
             save_event_log: Whether to save the full event log
             num_workers: Number of parallel workers (defaults to CPU count)
-            
+                
         Returns:
             List of game result dictionaries
         """
@@ -403,7 +580,7 @@ class TournamentManager:
             List of game result dictionaries
         """
         game_results = []
-        
+    
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
             futures = []
             game_idx = 0
@@ -411,9 +588,14 @@ class TournamentManager:
             # Submit all games to the executor
             for player1_idx, player2_idx in matchups:
                 for _ in range(games_per_matchup):
-                    # Create copies of players to avoid state contamination
-                    player1 = type(players[player1_idx])(players[player1_idx].name)
-                    player2 = type(players[player2_idx])(players[player2_idx].name)
+                    # This part should only receive matchups with not referenceble players
+                    # So we can safely create new instances
+                    player1_class = type(players[player1_idx])
+                    player2_class = type(players[player2_idx])
+                    
+                    # Create fresh instances for parallel execution
+                    player1 = player1_class(f"{players[player1_idx].name}_{game_idx}")
+                    player2 = player2_class(f"{players[player2_idx].name}_{game_idx}")
                     
                     # Randomly decide player order for fairness
                     if random.random() < 0.5:
@@ -433,7 +615,7 @@ class TournamentManager:
                     game_idx += 1
             
             # Collect results as they complete
-            for future in tqdm(as_completed(futures), total=len(futures), desc="Running games"):
+            for future in tqdm(as_completed(futures), total=len(futures), desc="Running parallel games"):
                 try:
                     game_result = future.result()
                     game_results.append(game_result)
@@ -445,9 +627,6 @@ class TournamentManager:
                         "error": str(e),
                         "players": [p.name for p in players]
                     })
-        
-        # Sort results by game index for consistency
-        game_results.sort(key=lambda x: x["game_index"])
         
         return game_results
     
@@ -481,13 +660,13 @@ class TournamentManager:
         return game_result
     
     def _run_single_game(
-            self, 
-            game_players: List[Player], 
-            game_idx: int, 
-            max_turns: int,
-            collect_turn_data: bool,
-            save_event_log: bool
-        ) -> Dict[str, Any]:
+        self, 
+        game_players: List[Player], 
+        game_idx: int, 
+        max_turns: int,
+        collect_turn_data: bool,
+        save_event_log: bool
+    ) -> Dict[str, Any]:
         """
         Run a single game and collect statistics.
         
@@ -501,19 +680,39 @@ class TournamentManager:
         Returns:
             Dictionary containing game results
         """
+        # Store original player names for stat tracking
+        original_names = {}
+        for player in game_players:
+            # Extract original name by removing any numeric suffix
+            original_name = player.name.split('_')[0]
+            if len(player.name.split('_')) > 1:
+                # For names that naturally have underscores, only remove numeric suffix at the end
+                try:
+                    suffix = player.name.split('_')[-1]
+                    if suffix.isdigit():  # Only remove if it's a numeric suffix
+                        original_name = '_'.join(player.name.split('_')[:-1])
+                    else:
+                        original_name = player.name
+                except:
+                    original_name = player.name
+                    
+            original_names[player.name] = original_name
+        
         # Initialize game result structure
         game_result = {
             "game_index": game_idx,
             "players": [player.name for player in game_players],
+            "original_players": [original_names[player.name] for player in game_players],
             "turn_count": 0,
             "max_turns_reached": False,
             "winner": None,
-            "is_draw": False,  # New: Track if the game ended in a draw
+            "is_draw": False,
             "bankrupt_players": [],
             "final_state": {},
             "player_stats": {player.name: {} for player in game_players},
             "turn_data": [] if collect_turn_data else None,
-            "events": [] if save_event_log else None
+            "events": [] if save_event_log else None,
+            "name_mapping": original_names  # Store name mapping for later use
         }
         
         try:
@@ -758,9 +957,6 @@ class TournamentManager:
     def _compute_player_statistics(self, tournament_results: Dict[str, Any]) -> None:
         """
         Compute aggregate statistics for each player across all games.
-        
-        Args:
-            tournament_results: Tournament results dictionary
         """
         player_names = tournament_results["players"]
         num_games = len(tournament_results["games"])
@@ -772,10 +968,10 @@ class TournamentManager:
             tournament_results["player_stats"][player_name] = {
                 "games_played": num_games,
                 "wins": 0,
-                "draws": 0,  # New: Track draws
-                "draw_rate": 0.0,  # New: Draw rate
-                "errors": 0,  # New: Track errors
-                "error_rate": 0.0,  # New: Error rate
+                "draws": 0,
+                "draw_rate": 0.0,
+                "errors": 0,
+                "error_rate": 0.0,
                 "bankrupt_games": 0,
                 "bankruptcies": 0,
                 "survival_rate": 0.0,
@@ -795,29 +991,68 @@ class TournamentManager:
             # Handle error games
             if "error" in game:
                 for player_name in game["players"]:
-                    if player_name in tournament_results["player_stats"]:
-                        tournament_results["player_stats"][player_name]["errors"] += 1
+                    # Map player name to original name if needed
+                    original_name = player_name
+                    if "name_mapping" in game and player_name in game["name_mapping"]:
+                        original_name = game["name_mapping"][player_name]
+                        
+                    if original_name in tournament_results["player_stats"]:
+                        tournament_results["player_stats"][original_name]["errors"] += 1
                 continue
                 
             # Handle normal games
             winner = game.get("winner")
             is_draw = game.get("is_draw", False)
             
+            # Map winner to original name if needed
+            if winner and "name_mapping" in game and winner in game["name_mapping"]:
+                winner = game["name_mapping"][winner]
+            
+            # Map bankrupt players to original names
+            bankrupt_players = []
+            for player_name in game.get("bankrupt_players", []):
+                if "name_mapping" in game and player_name in game["name_mapping"]:
+                    bankrupt_players.append(game["name_mapping"][player_name])
+                else:
+                    bankrupt_players.append(player_name)
+            
             for player_name in player_names:
-                if player_name not in game["player_stats"]:
+                # Check if this player was in the game
+                player_in_game = False
+                game_player_name = None
+                
+                # Find the player's name in this game
+                for game_player in game["players"]:
+                    if game_player == player_name:
+                        player_in_game = True
+                        game_player_name = game_player
+                        break
+                    elif "name_mapping" in game and game_player in game["name_mapping"] and game["name_mapping"][game_player] == player_name:
+                        player_in_game = True
+                        game_player_name = game_player
+                        break
+                
+                if not player_in_game:
                     continue
                     
-                player_game_stats = game["player_stats"][player_name]
+                # Get stats for this player
+                if game_player_name not in game["player_stats"]:
+                    continue
+                    
+                player_game_stats = game["player_stats"][game_player_name]
                 player_tournament_stats = tournament_results["player_stats"][player_name]
                 
-                # Track wins, draws, and bankrupcies
+                # Track wins, draws, and bankruptcies
                 if winner == player_name:
                     player_tournament_stats["wins"] += 1
                 
-                if is_draw and player_name in game.get("draw_players", []):
+                if is_draw and (
+                    (player_name in game.get("draw_players", [])) or 
+                    (game_player_name in game.get("draw_players", []))
+                ):
                     player_tournament_stats["draws"] += 1
                 
-                if player_game_stats.get("went_bankrupt", False):
+                if player_name in bankrupt_players or game_player_name in game.get("bankrupt_players", []):
                     player_tournament_stats["bankruptcies"] += 1
                 
                 # Count games where a bankruptcy occurred (by any player)
@@ -839,7 +1074,7 @@ class TournamentManager:
                         player_tournament_stats["property_group_preferences"][group] = 0
                     player_tournament_stats["property_group_preferences"][group] += count
         
-        # Calculate averages and rates
+        # Calculate averages and rates - this part remains unchanged
         for player_name in player_names:
             stats = tournament_results["player_stats"][player_name]
             valid_games = num_games - stats["errors"]
@@ -863,7 +1098,7 @@ class TournamentManager:
                 # Calculate development rate (houses+hotels per property)
                 if stats["avg_properties_owned"] > 0:
                     stats["development_rate"] = (stats["avg_houses_built"] + 
-                                               stats["avg_hotels_built"] * 5) / stats["avg_properties_owned"]
+                                            stats["avg_hotels_built"] * 5) / stats["avg_properties_owned"]
                 
                 # Normalize property group preferences
                 total_properties = sum(stats["property_group_preferences"].values())
@@ -875,12 +1110,10 @@ class TournamentManager:
                 stats["win_rate"] = 0
                 stats["draw_rate"] = 0
     
+    
     def _compute_matchup_statistics(self, tournament_results: Dict[str, Any]) -> None:
         """
         Compute head-to-head statistics for player matchups in 2-player tournaments.
-        
-        Args:
-            tournament_results: Tournament results dictionary
         """
         player_names = tournament_results["players"]
         
@@ -907,6 +1140,7 @@ class TournamentManager:
             if "matchup" not in game:
                 continue
                 
+            # Get the matchup - these are original player names
             player1, player2 = game["matchup"]
             
             # Create string key
@@ -928,20 +1162,37 @@ class TournamentManager:
                 matchup_stats[matchup_key]["draws"] += 1
                 continue
                 
-            # Handle wins and bankruptcies
+            # Map actual winner to original player name
             winner = game.get("winner")
+            if winner and "name_mapping" in game:
+                winner = game["name_mapping"].get(winner, winner)
+                
+            # Handle wins
             if winner:
-                matchup_stats[matchup_key]["by_player"][winner]["wins"] += 1
+                if winner in matchup_stats[matchup_key]["by_player"]:
+                    matchup_stats[matchup_key]["by_player"][winner]["wins"] += 1
             
-            # Update other stats
-            for player_name in [player1, player2]:
-                if player_name in game["player_stats"]:
-                    player_game_stats = game["player_stats"][player_name]
+            # Update other stats - need to map game player names to original names
+            game_players = game.get("players", [])
+            name_mapping = game.get("name_mapping", {})
+            
+            for game_player_name in game_players:
+                # Map to original name
+                original_name = name_mapping.get(game_player_name, game_player_name)
+                
+                # Only process if this player is part of the matchup
+                if original_name not in [player1, player2]:
+                    continue
                     
+                # Get stats using the game player name
+                if game_player_name in game["player_stats"]:
+                    player_game_stats = game["player_stats"][game_player_name]
+                    
+                    # Update matchup stats using original name
                     if player_game_stats.get("went_bankrupt", False):
-                        matchup_stats[matchup_key]["by_player"][player_name]["bankrupt"] += 1
+                        matchup_stats[matchup_key]["by_player"][original_name]["bankrupt"] += 1
                     
-                    matchup_stats[matchup_key]["by_player"][player_name]["avg_net_worth"] += (
+                    matchup_stats[matchup_key]["by_player"][original_name]["avg_net_worth"] += (
                         player_game_stats.get("final_net_worth", 0)
                     )
         
@@ -958,7 +1209,7 @@ class TournamentManager:
         
         # Store matchup statistics
         tournament_results["matchup_stats"] = matchup_stats
-    
+
     def _compute_overall_statistics(self, tournament_results: Dict[str, Any]) -> None:
         """
         Compute overall tournament statistics.

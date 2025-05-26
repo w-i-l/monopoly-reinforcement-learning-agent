@@ -19,7 +19,7 @@ class DefaultStrategicPlayer(Player):
     configurable parameters and game state analysis.
     """
     
-    def __init__(self, name: str, strategy_params: Optional[Dict] = None):
+    def __init__(self, name: str, strategy_params: Optional[Dict] = None, can_be_referenced: bool = False):
         """
         Initialize the strategic agent with optional custom parameters.
         
@@ -27,7 +27,7 @@ class DefaultStrategicPlayer(Player):
             name: The player's name
             strategy_params: Optional dictionary of strategy parameters that will override defaults
         """
-        super().__init__(name)
+        super().__init__(name, can_be_referenced=can_be_referenced)
         # Initialize with default strategy parameters
         self.strategy_params = self._get_default_params()
         # Override with any provided parameters

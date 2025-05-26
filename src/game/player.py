@@ -6,12 +6,19 @@ from game.bankruptcy_request import BankruptcyRequest
 # TODO: Allow player to upgrade/downgrade any number of times
 # eg. buy 2 houses on one property and 1 house on another, instead of buying one house per call
 class Player:
-    def __init__(self, name):
+    def __init__(self, name, can_be_referenced: bool = False):
+        '''
+        Arguments:
+            can_be_referenced: If True, this player can be referenced by the game, this means that
+            the player can be passed as a reference to the game and the game will not create a new instance of the player.
+            Otherwise, the game will create a new instance of the player and pass it to the game.
+        '''
         self.name = name
 
         self.event_queue = []
         self.event_history = []
         self.max_history = 100
+        self.can_be_referenced = can_be_referenced
 
     def __repr__(self):
         return f"{self.name}"
@@ -24,16 +31,16 @@ class Player:
         # TODO: Implement the logic to suggest which properties to upgrade
         return []
     
+    def get_downgrading_suggestions(self, game_state) -> List[PropertyGroup]:
+        # TODO: Implement the logic to suggest which properties to downgrade
+        return []
+    
     def get_mortgaging_suggestions(self, game_state) -> List[Tile]:
         # TODO: Implement the logic to suggest which properties to mortgage
         return []
     
     def get_unmortgaging_suggestions(self, game_state) -> List[Tile]:
         # TODO: Implement the logic to suggest which properties to unmortgage
-        return []
-    
-    def get_downgrading_suggestions(self, game_state) -> List[Tile]:
-        # TODO: Implement the logic to suggest which properties to downgrade
         return []
     
     def should_pay_get_out_of_jail_fine(self, game_state) -> bool:

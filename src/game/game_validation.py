@@ -115,7 +115,6 @@ class GameValidation:
         
         return None
 
-
     @staticmethod
     def validate_sell_house(game_state: GameState, player: Player, property_group: PropertyGroup) -> Optional[GameException]:
         if game_state.houses[property_group][0] <= 0:
