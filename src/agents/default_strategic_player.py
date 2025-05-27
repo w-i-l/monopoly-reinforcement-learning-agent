@@ -973,7 +973,7 @@ class DefaultStrategicPlayer(Player):
                         value_receiving += self.strategy_params["trade_monopoly_bonus"]
         
         # Value of money we're receiving
-        value_receiving += trade_offer.money_offered
+        value_receiving += trade_offer.money_offered or 0
         
         # Value of jail cards we're receiving (approximate)
         value_receiving += (trade_offer.jail_cards_offered or 0) * 50
@@ -993,10 +993,10 @@ class DefaultStrategicPlayer(Player):
                         value_giving += self.strategy_params["trade_monopoly_bonus"]
         
         # Value of money we're giving up
-        value_giving += trade_offer.money_requested
+        value_giving += trade_offer.money_requested or 0
         
         # Value of jail cards we're giving up (approximate)
-        value_giving += trade_offer.jail_cards_requested * 50
+        value_giving += (trade_offer.jail_cards_requested or 0) * 50
         
         # Calculate net value gain
         net_value = value_receiving - value_giving

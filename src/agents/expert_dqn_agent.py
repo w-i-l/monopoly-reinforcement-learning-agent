@@ -21,7 +21,7 @@ class DQNAgent(DefaultStrategicPlayer):
     DQN (Deep Q-Network) agent for Monopoly that inherits from DefaultStrategicPlayer.
     
     This agent uses deep Q-learning to make decisions for various methods,
-    including property purchases, upgrading suggestions, and jail fine decisions.
+    including property purchases, upgrading suggestions, downgrading suggestions, and jail fine decisions.
     """
     
     def __init__(
@@ -63,6 +63,7 @@ class DQNAgent(DefaultStrategicPlayer):
         self.epsilon_counter = {
             'buy_property': 0,
             'get_upgrading_suggestions': 0,
+            'get_downgrading_suggestions': 0,
             'should_pay_get_out_of_jail_fine': 0
         }
         
@@ -71,6 +72,7 @@ class DQNAgent(DefaultStrategicPlayer):
         self.dqn_methods = dqn_methods or {
             'buy_property': None,
             'get_upgrading_suggestions': None,
+            'get_downgrading_suggestions': None,
             'should_pay_get_out_of_jail_fine': None
         }
         
@@ -81,12 +83,14 @@ class DQNAgent(DefaultStrategicPlayer):
         self.action_dims = {
             'buy_property': 2,  # [don't buy, buy]
             'get_upgrading_suggestions': 8,  # [8 color groups]
+            'get_downgrading_suggestions': 8,  # [8 color groups]
             'should_pay_get_out_of_jail_fine': 2  # [don't pay, pay]
         }
 
         self.can_use_defaults_methods = can_use_defaults_methods or {
             'buy_property': False,
             'get_upgrading_suggestions': False,
+            'get_downgrading_suggestions': False,
             'should_pay_get_out_of_jail_fine': False
         }
         
@@ -102,6 +106,7 @@ class DQNAgent(DefaultStrategicPlayer):
         self.memory = {
             'buy_property': deque(maxlen=memory_size),
             'get_upgrading_suggestions': deque(maxlen=memory_size),
+            'get_downgrading_suggestions': deque(maxlen=memory_size),
             'should_pay_get_out_of_jail_fine': deque(maxlen=memory_size)
         }
         
@@ -109,6 +114,7 @@ class DQNAgent(DefaultStrategicPlayer):
         self.current_decisions = {
             'buy_property': None,
             'get_upgrading_suggestions': None,
+            'get_downgrading_suggestions': None,
             'should_pay_get_out_of_jail_fine': None
         }
         
@@ -304,7 +310,7 @@ class DQNAgent(DefaultStrategicPlayer):
         features.append(game_state.escape_jail_cards[current_player] / 2.0)
         features.append(game_state.escape_jail_cards[opponent] / 2.0 if opponent else 0.0)
         
-        # 2. Liquidity ratio - critical for upgrading decisions
+        # 2. Liquidity ratio - critical for upgrading/downgrading decisions
         total_assets = game_state.get_player_net_worth(current_player)
         cash = game_state.player_balances[current_player]
         liquidity_ratio = cash / max(total_assets, 1.0)  # Avoid division by zero
@@ -532,7 +538,6 @@ class DQNAgent(DefaultStrategicPlayer):
                 decision_type: str = 'buy_property') -> float:
         """
         Enhanced reward function that better captures strategic value.
-        Updated to include jail fine decisions.
         """
         # Calculate current net worth
         current_net_worth = game_state.get_player_net_worth(player)
@@ -595,6 +600,61 @@ class DQNAgent(DefaultStrategicPlayer):
                 if next_liquidity < 0.1 and next_liquidity < current_liquidity:
                     # Dangerously low liquidity
                     base_reward -= 0.2  # Penalty for risking bankruptcy
+                    
+            elif decision_type == 'get_downgrading_suggestions':
+                # For downgrading, focus on cash management and financial stability
+                base_reward = normalized_change * 0.8  # Lower multiplier since we're losing assets
+                
+                # Calculate development changes
+                prev_houses = sum(count for group, (count, owner) in game_state.houses.items() 
+                                if owner == player)
+                current_houses = sum(count for group, (count, owner) in next_game_state.houses.items() 
+                                    if owner == player)
+                
+                prev_hotels = sum(count for group, (count, owner) in game_state.hotels.items() 
+                                if owner == player)
+                current_hotels = sum(count for group, (count, owner) in next_game_state.hotels.items() 
+                                    if owner == player)
+                
+                # Cash situation analysis
+                prev_cash = game_state.player_balances[player]
+                current_cash = next_game_state.player_balances[player]
+                cash_increase = current_cash - prev_cash
+                
+                # If development was reduced (houses/hotels sold)
+                if current_houses < prev_houses or current_hotels < prev_hotels:
+                    # Good decision if we needed cash and got it
+                    if prev_cash < 200:  # Was in financial trouble
+                        base_reward += 0.3  # Reward for emergency cash management
+                    elif prev_cash < 500:  # Moderate financial stress
+                        base_reward += 0.15  # Moderate reward
+                    else:
+                        # Had plenty of cash - downgrading might be premature
+                        base_reward -= 0.1  # Small penalty
+                    
+                    # Bonus for raising significant cash
+                    if cash_increase > 100:
+                        base_reward += min(cash_increase / 500.0, 0.2)  # Up to 0.2 bonus
+                
+                # Penalty for downgrading high-value monopolies unnecessarily
+                for group in PropertyGroup:
+                    if (game_state.houses.get(group, [0, None])[1] == player and 
+                        next_game_state.houses.get(group, [0, None])[0] < game_state.houses.get(group, [0, None])[0]):
+                        # This group was downgraded
+                        if group in [PropertyGroup.ORANGE, PropertyGroup.RED]:
+                            # High-traffic groups - more penalty for downgrading
+                            base_reward -= 0.1
+                        elif group in [PropertyGroup.GREEN, PropertyGroup.BLUE]:
+                            # High-rent groups - penalty for downgrading
+                            base_reward -= 0.08
+                
+                # Reward for improved liquidity ratio
+                prev_liquidity = prev_cash / max(game_state.get_player_net_worth(player), 1)
+                current_liquidity = current_cash / max(next_game_state.get_player_net_worth(player), 1)
+                
+                if current_liquidity > prev_liquidity and prev_liquidity < 0.15:
+                    # Improved liquidity from dangerous level
+                    base_reward += 0.2
                     
             elif decision_type == 'should_pay_get_out_of_jail_fine':
                 # For jail fine decisions, focus on cash preservation vs mobility trade-off
@@ -988,6 +1048,142 @@ class DQNAgent(DefaultStrategicPlayer):
             # Fall back to a simple heuristic
             # Pay if we have more than 3x the jail fine
             return random.choice([True, False])
+        
+
+    def get_downgrading_suggestions(self, game_state: GameState) -> List[PropertyGroup]:
+        """
+        Decide which property groups to downgrade using the DQN policy.
+        
+        Args:
+            game_state: Current game state
+            
+        Returns:
+            List of PropertyGroup to downgrade
+        """
+        # Check if we should use DQN for this method
+        method = 'get_downgrading_suggestions'
+        if method not in self.q_networks:
+            if not self.can_use_defaults_methods[method]:
+                print(f"Using parent class implementation for {method}")
+                print(self.q_networks)
+                print(self.can_use_defaults_methods)
+                exit(-1)
+            # Use parent class implementation
+            return super().get_downgrading_suggestions(game_state)
+        
+        if super().get_downgrading_suggestions(game_state) == []:
+            # If parent implementation returns empty, we can't downgrade
+            return []
+
+        # Update epsilon counter for this method
+        if method not in self.epsilon_counter:
+            self.epsilon_counter[method] = 0
+        self.epsilon_counter[method] += 1
+        print(f"Using DQN for {method}")
+
+        try:
+            # Encode the state
+            state = self.encode_state(game_state)
+            state_tensor = tf.convert_to_tensor([state], dtype=tf.float32)
+            
+            # Get Q-values for each property group
+            q_values = self.q_networks[method](state_tensor)
+            
+            # Filter valid property groups (those we own completely and can downgrade)
+            valid_groups = []
+            group_indices = {}
+            
+            for i, group in enumerate(PropertyGroup):
+                # Group is valid if EITHER houses OR hotels can be sold
+                house_valid = not GameValidation.validate_sell_house(game_state, self, group)
+                hotel_valid = not GameValidation.validate_sell_hotel(game_state, self, group)
+                
+                if house_valid or hotel_valid:
+                    valid_groups.append(group)
+                group_indices[group] = i
+            
+            # In training mode, use epsilon-greedy policy
+            selected_group = None
+            if self.training and (method == self.active_training_method):
+                if np.random.random() < self.epsilon:
+                    # Random valid group or none
+                    if valid_groups:
+                        selected_group = np.random.choice(valid_groups)
+                        action = group_indices[selected_group]
+                    else:
+                        # Return empty list (no downgrades)
+                        action = -1  # Special code for no downgrades
+                else:
+                    # Select the group with highest Q-value among valid groups
+                    if valid_groups:
+                        valid_q_values = [(group_indices[g], q_values[0][group_indices[g]]) for g in valid_groups]
+                        best_idx, _ = max(valid_q_values, key=lambda x: x[1])
+                        action = best_idx
+                    else:
+                        # No valid groups
+                        action = -1
+                
+                # Store the current decision for future reward
+                self.current_decisions[method] = {
+                    'state': state,
+                    'action': action,
+                    'game_state': game_state
+                }
+                
+                # Decay epsilon
+                if self.epsilon_counter[method] % self.epsilon_update_freq == 0:
+                    self.epsilon = max(self.epsilon_end, self.epsilon * self.epsilon_decay)
+            else:
+                # In evaluation mode, select the group with highest Q-value among valid groups
+                if valid_groups:
+                    valid_q_values = [(group_indices[g], q_values[0][group_indices[g]]) for g in valid_groups]
+                    best_idx, _ = max(valid_q_values, key=lambda x: x[1])
+                    action = best_idx
+                else:
+                    # No valid groups
+                    action = -1
+            
+            for group, idx in group_indices.items():
+                if idx == action:
+                    selected_group = group
+                    break
+
+            if selected_group and selected_group in valid_groups:
+                can_be_added = False
+                # If we can sell a house OR a hotel, add the group
+                if not GameValidation.validate_sell_house(game_state=game_state, player=self, property_group=selected_group):
+                    can_be_added = True
+                elif not GameValidation.validate_sell_hotel(game_state=game_state, player=self, property_group=selected_group):
+                    can_be_added = True
+                if can_be_added:
+                    return [selected_group]
+            
+            # If no valid group selected, return empty list
+            return []
+        
+        except Exception as e:
+            print(f"Error in get_downgrading_suggestions: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Fallback to empty list with a penalty in training mode
+            if self.training and (method == self.active_training_method):
+                try:
+                    state = self.encode_state(game_state)
+                    action = -1  # No downgrade
+                    self.memory[method].append((
+                        state,
+                        action,
+                        -0.5,  # Penalty for error
+                        state,  # Same state as next_state since we don't have a real transition
+                        True  # Treat as a terminal state
+                    ))
+                except:
+                    pass
+            
+            # Fall back to parent implementation
+            return super().get_downgrading_suggestions(game_state)
+
         
     def update_decision(self, method: str, next_game_state: GameState, done: bool = False):
         """

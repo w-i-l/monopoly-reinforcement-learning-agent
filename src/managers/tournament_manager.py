@@ -396,6 +396,7 @@ class TournamentManager:
             for method in clean_agent.memory:
                 clean_agent.memory[method].clear()
             
+            print(f"Created clean DQN agent: {clean_agent.name} for game {game_suffix}")
             return clean_agent
         else:
             # For other referenceable agents, just return the original

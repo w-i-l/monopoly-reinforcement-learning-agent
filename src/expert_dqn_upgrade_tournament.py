@@ -4,6 +4,7 @@ import json
 import time
 from datetime import datetime
 import random
+from collections import deque
 
 # Import your existing code
 from agents.expert_dqn_agent import DQNAgent
@@ -26,73 +27,6 @@ from game.game_validation import GameValidation
 from game.game_state import GameState
 from models.property_group import PropertyGroup
 from models.property import Property
-
-# Add ControllDQNAgent variants for comparison
-class BuyPropertyControllDQNAgent(DefaultStrategicPlayer):
-    '''
-    DQN comparing agent for tournament, randomizing property buying.
-    '''
-    def __init__(self, name):
-        super().__init__(name)
-
-    def should_buy_property(self, game_state, property_tile):
-        if error := GameValidation.validate_buy_property(game_state, self, property_tile):
-            return False
-        return random.choice([True, False])
-
-
-class UpgradingControllDQNAgent(DefaultStrategicPlayer):
-    '''
-    DQN comparing agent for tournament, randomizing upgrading suggestions.
-    '''
-    def __init__(self, name):
-        super().__init__(name)
-
-    def get_upgrading_suggestions(self, game_state):
-        properties = game_state.properties[self]
-        properties = [property for property in properties if isinstance(property, Property)]
-        grouped_properties = {property.group: [] for property in properties if isinstance(property, Property)}
-
-        for property in properties:
-            grouped_properties[property.group].append(property)
-
-        budget = game_state.player_balances[self]
-        suggestions = []
-
-        for group in grouped_properties:
-            group_len = len(game_state.board.get_properties_by_group(group))
-            should_upgrade = random.choice([True, False])
-
-            for property in grouped_properties[group]:
-                if property in game_state.mortgaged_properties:
-                    # can t upgrade this group
-                    break
-
-            # if we can upgrade this group
-            else :
-                if group_len == len(grouped_properties[group]):
-                    # if we can build a house
-                    if error := GameValidation.validate_place_house(game_state, self, group):
-                        pass
-                    else:
-                        price = group.house_cost() * group_len
-                        if budget >= price and should_upgrade:
-                            suggestions.append(group)
-                            budget -= price
-                            continue # we can t build a hotel
-
-                    # if we can build a hotel
-                    if error := GameValidation.validate_place_hotel(game_state, self, group):
-                        pass
-                    else:
-                        price = group.hotel_cost() * group_len
-                        if budget >= price and should_upgrade:
-                            suggestions.append(group)
-                            budget -= price
-
-        return suggestions
-
-from collections import deque
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow warnings
 
@@ -152,6 +86,7 @@ def modify_dqn_for_compatibility():
             self.action_dims = getattr(DQNAgent, '_action_dims', {
                 'buy_property': 2, 
                 'get_upgrading_suggestions': 8,
+                'get_downgrading_suggestions': 8,
                 'should_pay_get_out_of_jail_fine': 2
             })
             
@@ -165,12 +100,6 @@ def modify_dqn_for_compatibility():
             if 'can_use_defaults_methods' in kwargs:
                 self.can_use_defaults_methods.update(kwargs['can_use_defaults_methods'])
             
-            self.cau_use_defaults_methods = {
-                'buy_property': False,
-                'get_upgrading_suggestions':False,
-                'should_pay_get_out_of_jail_fine': False
-            }
-
             self.active_training_method = None  # Not training
             
             # Initialize network dictionaries
@@ -181,6 +110,7 @@ def modify_dqn_for_compatibility():
             self.epsilon_counter = {
                 'buy_property': 0,
                 'get_upgrading_suggestions': 0,
+                'get_downgrading_suggestions': 0,
                 'should_pay_get_out_of_jail_fine': 0
             }
             
@@ -200,6 +130,7 @@ def modify_dqn_for_compatibility():
             self.memory = {
                 'buy_property': deque(maxlen=10000),
                 'get_upgrading_suggestions': deque(maxlen=10000),
+                'get_downgrading_suggestions': deque(maxlen=10000),
                 'should_pay_get_out_of_jail_fine': deque(maxlen=10000)
             }
             
@@ -207,6 +138,7 @@ def modify_dqn_for_compatibility():
             self.current_decisions = {
                 'buy_property': None,
                 'get_upgrading_suggestions': None,
+                'get_downgrading_suggestions': None,
                 'should_pay_get_out_of_jail_fine': None
             }
             
@@ -264,26 +196,71 @@ def create_tournament_dqn_agent(original_agent, name_suffix=""):
             tournament_agent.target_networks[method].set_weights(
                 original_agent.target_networks[method].get_weights()
             )
-
-    tournament_agent.cau_use_defaults_methods = {
-        'buy_property': False,
-        'get_upgrading_suggestions':False,
-        'should_pay_get_out_of_jail_fine': False
-    }
     
     return tournament_agent
+
+def determine_dqn_configuration(buy_model_path, upgrade_model_path, downgrade_model_path, pay_fine_model_path):
+    """
+    Dynamically determine DQN configuration based on provided model paths.
+    
+    Args:
+        buy_model_path: Path to buy property model (None if not using DQN)
+        upgrade_model_path: Path to upgrading model (None if not using DQN)
+        downgrade_model_path: Path to downgrading model (None if not using DQN)
+        pay_fine_model_path: Path to jail fine model (None if not using DQN)
+        
+    Returns:
+        Tuple of (dqn_methods, can_use_defaults_methods, active_methods)
+    """
+    # All available methods
+    all_methods = [
+        'buy_property',
+        'get_upgrading_suggestions', 
+        'get_downgrading_suggestions',
+        'should_pay_get_out_of_jail_fine'
+    ]
+    
+    # Map model paths to methods
+    model_paths = {
+        'buy_property': buy_model_path,
+        'get_upgrading_suggestions': upgrade_model_path,
+        'get_downgrading_suggestions': downgrade_model_path,
+        'should_pay_get_out_of_jail_fine': pay_fine_model_path
+    }
+    
+    # Configure DQN methods and defaults based on model availability
+    dqn_methods = {}
+    can_use_defaults_methods = {}
+    active_methods = []
+    
+    for method in all_methods:
+        model_path = model_paths[method]
+        if model_path is not None:
+            # Use DQN for this method
+            dqn_methods[method] = model_path
+            can_use_defaults_methods[method] = False
+            active_methods.append(method)
+        else:
+            # Use parent class method
+            dqn_methods[method] = None
+            can_use_defaults_methods[method] = True
+    
+    return dqn_methods, can_use_defaults_methods, active_methods
 
 def run_dqn_tournament(
         buy_model_path: str, 
         upgrade_model_path: str,
+        downgrade_model_path: str,
         pay_fine_model_path: str,
         config):
     """
     Run a tournament including the DQN agent against other agent types.
     
     Args:
-        buy_model_path: Path to the saved DQN agent model for property buying
-        upgrade_model_path: Path to the saved DQN agent model for upgrading suggestions
+        buy_model_path: Path to the saved DQN agent model for property buying (None if not using)
+        upgrade_model_path: Path to the saved DQN agent model for upgrading suggestions (None if not using)
+        downgrade_model_path: Path to the saved DQN agent model for downgrading suggestions (None if not using)
+        pay_fine_model_path: Path to the saved DQN agent model for jail fine decisions (None if not using)
         config: Configuration dictionary
         
     Returns:
@@ -297,35 +274,28 @@ def run_dqn_tournament(
     max_turns = config.get('max_turns', 1000)
     parallel = config.get('parallel', False)
     num_workers = config.get('num_workers', None)
-    use_buy_dqn = config.get('use_buy_dqn', True)
-    use_upgrade_dqn = config.get('use_upgrade_dqn', True)
-    use_pay_fine_dqn = config.get('use_pay_fine_dqn', True)
     
-    # Determine which DQN methods to use
-    dqn_methods = {
-        'buy_property': None,
-        'get_upgrading_suggestions': None,
-        'should_pay_get_out_of_jail_fine': None
-    }
-    active_methods = []
+    # Determine DQN configuration dynamically
+    dqn_methods, can_use_defaults_methods, active_methods = determine_dqn_configuration(
+        buy_model_path, upgrade_model_path, downgrade_model_path, pay_fine_model_path
+    )
     
-    if use_buy_dqn and buy_model_path:
-        dqn_methods['buy_property'] = buy_model_path
-        active_methods.append('buy_property')
+    # Check if at least one DQN method is being used
+    if not active_methods:
+        print("Error: No valid model paths provided. At least one DQN method must be specified.")
+        return None, None
     
-    if use_upgrade_dqn and upgrade_model_path:
-        dqn_methods['get_upgrading_suggestions'] = upgrade_model_path
-        active_methods.append('get_upgrading_suggestions')
-
-    if use_pay_fine_dqn and pay_fine_model_path:
-        dqn_methods['should_pay_get_out_of_jail_fine'] = pay_fine_model_path
-        active_methods.append('should_pay_get_out_of_jail_fine')
-
+    print(f"DQN methods configuration:")
+    for method, path in dqn_methods.items():
+        status = "DQN" if path is not None else "Parent Class"
+        print(f"  {method}: {status}")
+    
     # Initialize DQN agent
     dqn_agent = DQNAgent(
         "DQN_Player",
         training=False,  # Set to evaluation mode
         dqn_methods=dqn_methods,
+        can_use_defaults_methods=can_use_defaults_methods
     )
     dqn_agent.epsilon = 0.05  # Low epsilon for evaluation
 
@@ -333,27 +303,18 @@ def run_dqn_tournament(
     tournament_dqn_agent.can_be_referenced = False  # Force new instances
     
     # Load models explicitly to ensure they're available
-    if use_buy_dqn and buy_model_path:
-        print("Loading model for buy_property method...")
-        dqn_agent.load_model_for_method('buy_property', buy_model_path)
-    
-    if use_upgrade_dqn and upgrade_model_path:
-        print("Loading model for get_upgrading_suggestions method...")
-        dqn_agent.load_model_for_method('get_upgrading_suggestions', upgrade_model_path)
-
-    if use_pay_fine_dqn and pay_fine_model_path:
-        print("Loading model for should_pay_get_out_of_jail_fine method...")
-        dqn_agent.load_model_for_method('should_pay_get_out_of_jail_fine', pay_fine_model_path)
+    for method, model_path in dqn_methods.items():
+        if model_path is not None:
+            print(f"\n\nLoading model for {method} method...")
+            dqn_agent.load_model_for_method(method, model_path)
     
     # Debug - check if the methods are in q_networks after loading
-    print(f"DQN agent active methods: {active_methods}")
-    print(f"Available methods in q_networks: {list(dqn_agent.q_networks.keys())}")
+    print(f"\nDQN agent active methods: {active_methods}")
+    print(f"Available methods in q_networks: {list(dqn_agent.q_networks.keys())}\n")
     
     # Create all player types
     players = [
         tournament_dqn_agent,
-        # BuyPropertyControllDQNAgent("BuyRandom_Player"),
-        UpgradingControllDQNAgent("UpgradeRandom_Player"),
         RandomAgent("Random_Player"),
         StrategicAgent("Strategic_Player"),
         DefaultStrategicPlayer("DefaultStrategic_Player"),
@@ -377,8 +338,8 @@ def run_dqn_tournament(
     tournament_dir = os.path.join(output_dir, f"tournament_{timestamp}")
     tournament_manager = TournamentManager(output_dir=tournament_dir)
     
-    print(f"Starting tournament with {len(players)} players...")
-    print(f"Players: {[player.name for player in players]}")
+    print(f"\nStarting tournament with {len(players)} players...")
+    print(f"Players: {[player.name for player in players]}\n")
     
     # Run tournament
     start_time = time.time()
@@ -418,12 +379,17 @@ def run_dqn_tournament(
     # Save DQN-specific results separately
     dqn_results = {
         'timestamp': timestamp,
-        'buy_model_path': buy_model_path,
-        'upgrade_model_path': upgrade_model_path,
-        'dqn_configuration': {
-            'buy_property': 'DQN' if use_buy_dqn and buy_model_path else 'Parent',
-            'get_upgrading_suggestions': 'DQN' if use_upgrade_dqn and upgrade_model_path else 'Parent'
+        'model_paths': {
+            'buy_property': buy_model_path,
+            'upgrading': upgrade_model_path,
+            'downgrading': downgrade_model_path,
+            'jail_fine': pay_fine_model_path
         },
+        'dqn_configuration': {
+            method: 'DQN' if dqn_methods[method] is not None else 'Parent'
+            for method in dqn_methods.keys()
+        },
+        'active_dqn_methods': active_methods,
         'two_player': two_player,
         'games_per_matchup': games_per_matchup if two_player else None,
         'num_games': num_games if not two_player else None,
@@ -501,27 +467,15 @@ def main():
     """Main function to parse arguments and run tournament."""
     parser = argparse.ArgumentParser(description='Run tournament with DQN Agent for Monopoly')
     
-    # Model paths
+    # Model paths - all optional, dynamically configured
     parser.add_argument('--buy-model-path', type=str, default=None,
-                       help='Path to saved model for buy property decision (without suffixes)')
+                       help='Path to saved model for buy property decision (without suffixes). If not provided, uses parent class method.')
     parser.add_argument('--upgrade-model-path', type=str, default=None,
-                       help='Path to saved model for upgrading suggestions (without suffixes)')
+                       help='Path to saved model for upgrading suggestions (without suffixes). If not provided, uses parent class method.')
+    parser.add_argument('--downgrade-model-path', type=str, default=None,
+                       help='Path to saved model for downgrading suggestions (without suffixes). If not provided, uses parent class method.')
     parser.add_argument('--pay-fine-model-path', type=str, default=None,
-                          help='Path to saved model for paying get out of jail fine decision (without suffixes)')
-    
-    # DQN configuration flags
-    parser.add_argument('--use-buy-dqn', action='store_true', default=True,
-                       help='Use DQN for property buying decisions (default)')
-    parser.add_argument('--no-buy-dqn', action='store_true',
-                       help='Do not use DQN for property buying (use parent class method)')
-    parser.add_argument('--use-upgrade-dqn', action='store_true', default=True,
-                       help='Use DQN for upgrading suggestions (default)')
-    parser.add_argument('--no-upgrade-dqn', action='store_true',
-                       help='Do not use DQN for upgrading (use parent class method)')
-    parser.add_argument('--use-pay-fine-dqn', action='store_true', default=True,
-                       help='Use DQN for paying get out of jail fine (default)')
-    parser.add_argument('--no-pay-fine-dqn', action='store_true',
-                          help='Do not use DQN for paying get out of jail fine (use parent class method)')
+                       help='Path to saved model for paying get out of jail fine decision (without suffixes). If not provided, uses parent class method.')
     
     # Tournament type
     parser.add_argument('--two-player', action='store_true', default=True,
@@ -530,7 +484,7 @@ def main():
                        help='Run a standard tournament with all players in each game')
     
     # Tournament parameters
-    parser.add_argument('--games-per-matchup', type=int, default=300,
+    parser.add_argument('--games-per-matchup', type=int, default=100,
                        help='Number of games per matchup in 2-player tournament')
     parser.add_argument('--num-games', type=int, default=300,
                        help='Number of games in standard tournament')
@@ -549,21 +503,17 @@ def main():
     parser.add_argument('--output-dir', type=str, default='tournament_results',
                        help='Directory to save tournament results')
     
-
     args = parser.parse_args()
     
     # Apply DQN compatibility modifications
     modify_dqn_for_compatibility()
     
-    # Check if required model paths are provided
-    if not args.buy_model_path and not args.upgrade_model_path:
-        print("Error: At least one of --buy-model-path or --upgrade-model-path must be provided.")
+    # Check if at least one model path is provided
+    model_paths = [args.buy_model_path, args.upgrade_model_path, args.downgrade_model_path, args.pay_fine_model_path]
+    if not any(path is not None for path in model_paths):
+        print("Error: At least one model path must be provided.")
+        print("Available options: --buy-model-path, --upgrade-model-path, --downgrade-model-path, --pay-fine-model-path")
         return
-
-    # Handle conflicting flags
-    use_buy_dqn = args.use_buy_dqn and not args.no_buy_dqn and args.buy_model_path is not None
-    use_upgrade_dqn = args.use_upgrade_dqn and not args.no_upgrade_dqn and args.upgrade_model_path is not None
-    use_pay_fine_dqn = args.pay_fine_model_path is not None
     
     # Determine tournament type (two_player is default)
     two_player = not args.standard
@@ -581,10 +531,7 @@ def main():
         'num_games': args.num_games,
         'max_turns': args.max_turns,
         'parallel': parallel,
-        'num_workers': args.workers,
-        'use_buy_dqn': use_buy_dqn,
-        'use_upgrade_dqn': use_upgrade_dqn,
-        'use_pay_fine_dqn': use_pay_fine_dqn
+        'num_workers': args.workers
     }
     
     # Print configuration
@@ -597,29 +544,35 @@ def main():
     print(f"  Maximum turns per game: {config['max_turns']}")
     print(f"  Execution mode: {'Hybrid parallel' if parallel else 'Sequential'}")
     
-    # Print DQN configuration
-    print("DQN configuration:")
-    print(f"  Buy property model: {args.buy_model_path if use_buy_dqn else 'Not used (parent method)'}")
-    print(f"  Upgrading model: {args.upgrade_model_path if use_upgrade_dqn else 'Not used (parent method)'}")
-    print(f"  Pay fine model: {args.pay_fine_model_path if args.pay_fine_model_path else 'Not used (parent method)'}")
+    # Print model configuration
+    print("\nModel configuration:")
+    print(f"  Buy property model: {args.buy_model_path if args.buy_model_path else 'Parent class method'}")
+    print(f"  Upgrading model: {args.upgrade_model_path if args.upgrade_model_path else 'Parent class method'}")
+    print(f"  Downgrading model: {args.downgrade_model_path if args.downgrade_model_path else 'Parent class method'}")
+    print(f"  Pay fine model: {args.pay_fine_model_path if args.pay_fine_model_path else 'Parent class method'}")
     
     # Start tournament
-    print("Starting tournament with DQN agent...")
+    print("\nStarting tournament with DQN agent...")
     try:
-        run_dqn_tournament(
+        results, dqn_results = run_dqn_tournament(
             buy_model_path=args.buy_model_path,
             upgrade_model_path=args.upgrade_model_path,
+            downgrade_model_path=args.downgrade_model_path,
             pay_fine_model_path=args.pay_fine_model_path, 
             config=config
         )
-        print("\nTournament completed successfully!")
+        
+        if results is not None:
+            print("\nTournament completed successfully!")
+        else:
+            print("Tournament failed to run.")
+            
     except KeyboardInterrupt:
         print("Tournament interrupted by user.")
     except Exception as e:
         print(f"Error during tournament: {e}")
         import traceback
         traceback.print_exc()
-
 
 if __name__ == "__main__":
     main()
