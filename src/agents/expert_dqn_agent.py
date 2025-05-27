@@ -64,7 +64,8 @@ class DQNAgent(DefaultStrategicPlayer):
             'buy_property': 0,
             'get_upgrading_suggestions': 0,
             'get_downgrading_suggestions': 0,
-            'should_pay_get_out_of_jail_fine': 0
+            'should_pay_get_out_of_jail_fine': 0,
+            'should_use_escape_jail_card': 0
         }
         
         # Define which methods should use DQN and which ones inherit from parent
@@ -73,7 +74,8 @@ class DQNAgent(DefaultStrategicPlayer):
             'buy_property': None,
             'get_upgrading_suggestions': None,
             'get_downgrading_suggestions': None,
-            'should_pay_get_out_of_jail_fine': None
+            'should_pay_get_out_of_jail_fine': None,
+            'should_use_escape_jail_card': None
         }
         
         # Which method is currently being trained (if any)
@@ -84,14 +86,16 @@ class DQNAgent(DefaultStrategicPlayer):
             'buy_property': 2,  # [don't buy, buy]
             'get_upgrading_suggestions': 8,  # [8 color groups]
             'get_downgrading_suggestions': 8,  # [8 color groups]
-            'should_pay_get_out_of_jail_fine': 2  # [don't pay, pay]
+            'should_pay_get_out_of_jail_fine': 2,  # [don't pay, pay]
+            'should_use_escape_jail_card': 2  # [don't use card, use card]
         }
 
         self.can_use_defaults_methods = can_use_defaults_methods or {
             'buy_property': False,
             'get_upgrading_suggestions': False,
             'get_downgrading_suggestions': False,
-            'should_pay_get_out_of_jail_fine': False
+            'should_pay_get_out_of_jail_fine': False,
+            'should_use_escape_jail_card': False
         }
         
         # Network dictionaries to hold separate networks for each decision
@@ -107,7 +111,8 @@ class DQNAgent(DefaultStrategicPlayer):
             'buy_property': deque(maxlen=memory_size),
             'get_upgrading_suggestions': deque(maxlen=memory_size),
             'get_downgrading_suggestions': deque(maxlen=memory_size),
-            'should_pay_get_out_of_jail_fine': deque(maxlen=memory_size)
+            'should_pay_get_out_of_jail_fine': deque(maxlen=memory_size),
+            'should_use_escape_jail_card': deque(maxlen=memory_size)
         }
         
         # For tracking decisions during a game
@@ -115,11 +120,13 @@ class DQNAgent(DefaultStrategicPlayer):
             'buy_property': None,
             'get_upgrading_suggestions': None,
             'get_downgrading_suggestions': None,
-            'should_pay_get_out_of_jail_fine': None
+            'should_pay_get_out_of_jail_fine': None,
+            'should_use_escape_jail_card': None
         }
         
         # Game state reference
         self.game_state = None
+
     
     def _init_networks(self):
         """Initialize Q-network and target network for each active decision type."""
@@ -538,6 +545,7 @@ class DQNAgent(DefaultStrategicPlayer):
                 decision_type: str = 'buy_property') -> float:
         """
         Enhanced reward function that better captures strategic value.
+        Updated to include downgrading, jail fine, and escape jail card decisions.
         """
         # Calculate current net worth
         current_net_worth = game_state.get_player_net_worth(player)
@@ -691,6 +699,46 @@ class DQNAgent(DefaultStrategicPlayer):
                         base_reward += 0.1  # Good decision to stay in dangerous situation
                     else:  # Paid to get out
                         base_reward -= 0.1  # Risky decision in dangerous situation
+                        
+            elif decision_type == 'should_use_escape_jail_card':
+                # For escape jail card decisions, focus on card conservation vs mobility
+                base_reward = normalized_change
+                
+                # Factor in card usage
+                prev_cards = game_state.escape_jail_cards[player]
+                current_cards = next_game_state.escape_jail_cards[player]
+                card_used = prev_cards > current_cards
+                
+                if card_used:
+                    # We used a card
+                    # Reward based on how many cards we had
+                    if prev_cards > 1:
+                        base_reward += 0.05  # Had multiple cards, using one is fine
+                    else:
+                        # Used our only card - better be worth it
+                        if net_worth_change > 50:
+                            base_reward += 0.15  # Good move, led to profit
+                        else:
+                            base_reward -= 0.05  # Maybe should have saved the card
+                    
+                    # Bonus if getting out led to profitable moves
+                    if net_worth_change > 0:
+                        base_reward += 0.1  # Getting out was profitable
+                        
+                    # Consider cash situation - if low on cash, using card instead of paying is smart
+                    current_cash = game_state.player_balances[player]
+                    if current_cash < 300:
+                        base_reward += 0.2  # Smart to use card when cash is low
+                else:
+                    # We didn't use the card (stayed in jail)
+                    # Consider board danger
+                    danger_score = self._assess_board_danger_simple(game_state, player)
+                    if danger_score > 0.6:  # High danger
+                        base_reward += 0.1  # Good decision to stay in dangerous situation
+                    else:
+                        # Board not that dangerous, maybe missed opportunity
+                        if prev_cards > 1:
+                            base_reward -= 0.05  # Had cards to spare, could have used one
             else:
                 # Default case
                 base_reward = normalized_change
@@ -713,6 +761,7 @@ class DQNAgent(DefaultStrategicPlayer):
         
         # If no next state, return small positive reward for valid actions
         return 0.1
+    
 
     def _assess_board_danger_simple(self, game_state: GameState, player) -> float:
         """
@@ -1079,7 +1128,6 @@ class DQNAgent(DefaultStrategicPlayer):
         if method not in self.epsilon_counter:
             self.epsilon_counter[method] = 0
         self.epsilon_counter[method] += 1
-        print(f"Using DQN for {method}")
 
         try:
             # Encode the state
@@ -1183,6 +1231,82 @@ class DQNAgent(DefaultStrategicPlayer):
             
             # Fall back to parent implementation
             return super().get_downgrading_suggestions(game_state)
+        
+    
+    def should_use_escape_jail_card(self, game_state: GameState) -> bool:
+        """
+        Decide whether to use a Get Out of Jail Free card using the DQN policy.
+        
+        Args:
+            game_state: Current game state
+            
+        Returns:
+            True if the agent decides to use the card, False otherwise
+        """
+        # First validate we're actually in jail and have a card
+        if not game_state.in_jail.get(self, False):
+            return False
+            
+        # Check if we have an escape jail card
+        if game_state.escape_jail_cards.get(self, 0) == 0:
+            return False
+        
+        # Check if we should use DQN for this method
+        method = 'should_use_escape_jail_card'
+        if method not in self.q_networks:
+            if not self.can_use_defaults_methods[method]:
+                print(f"Using parent class implementation for {method}")
+                print(self.q_networks)
+                print(self.can_use_defaults_methods)
+                exit(-1)
+            # Use parent class implementation
+            return super().should_use_escape_jail_card(game_state)
+
+        # Update epsilon counter for this method
+        if method not in self.epsilon_counter:
+            self.epsilon_counter[method] = 0
+        self.epsilon_counter[method] += 1
+
+        try:
+            # Encode the state
+            state = self.encode_state(game_state)
+            state_tensor = tf.convert_to_tensor([state], dtype=tf.float32)
+            
+            # Get Q-values for the state
+            q_values = self.q_networks[method](state_tensor)[0].numpy()
+            
+            # Determine action
+            if self.training and (method == self.active_training_method):
+                # Epsilon-greedy in training mode
+                if np.random.random() < self.epsilon:
+                    action = int(np.random.random() > 0.5)  # Random binary decision
+                else:
+                    action = int(q_values[1] > q_values[0])  # Use card if Q(use) > Q(don't use)
+                
+                # Store decision for future reward calculation
+                self.current_decisions[method] = {
+                    'state': state,
+                    'action': action,
+                    'game_state': game_state,
+                    'cards_before': game_state.escape_jail_cards[self]
+                }
+                
+                # Decay epsilon occasionally
+                if self.epsilon_counter[method] % self.epsilon_update_freq == 0:
+                    self.epsilon = max(self.epsilon_end, self.epsilon * self.epsilon_decay)
+            else:
+                # Pure exploitation in evaluation mode
+                action = int(q_values[1] > q_values[0])  # Use card if Q(use) > Q(don't use)
+            
+            return bool(action)  # 0 = don't use card, 1 = use card
+        
+        except Exception as e:
+            print(f"Error in should_use_escape_jail_card: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Fall back to a simple heuristic
+            return random.choice([True, False])
 
         
     def update_decision(self, method: str, next_game_state: GameState, done: bool = False):

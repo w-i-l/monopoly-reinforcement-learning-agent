@@ -87,7 +87,8 @@ def modify_dqn_for_compatibility():
                 'buy_property': 2, 
                 'get_upgrading_suggestions': 8,
                 'get_downgrading_suggestions': 8,
-                'should_pay_get_out_of_jail_fine': 2
+                'should_pay_get_out_of_jail_fine': 2,
+                'should_use_escape_jail_card': 2
             })
             
             # CRITICAL FIX: Use stored configuration instead of parameters
@@ -111,7 +112,8 @@ def modify_dqn_for_compatibility():
                 'buy_property': 0,
                 'get_upgrading_suggestions': 0,
                 'get_downgrading_suggestions': 0,
-                'should_pay_get_out_of_jail_fine': 0
+                'should_pay_get_out_of_jail_fine': 0,
+                'should_use_escape_jail_card': 0
             }
             
             # Use class-level cached networks if available
@@ -131,7 +133,8 @@ def modify_dqn_for_compatibility():
                 'buy_property': deque(maxlen=10000),
                 'get_upgrading_suggestions': deque(maxlen=10000),
                 'get_downgrading_suggestions': deque(maxlen=10000),
-                'should_pay_get_out_of_jail_fine': deque(maxlen=10000)
+                'should_pay_get_out_of_jail_fine': deque(maxlen=10000),
+                'should_use_escape_jail_card': deque(maxlen=10000)
             }
             
             # For tracking decisions during a game
@@ -139,7 +142,8 @@ def modify_dqn_for_compatibility():
                 'buy_property': None,
                 'get_upgrading_suggestions': None,
                 'get_downgrading_suggestions': None,
-                'should_pay_get_out_of_jail_fine': None
+                'should_pay_get_out_of_jail_fine': None,
+                'should_use_escape_jail_card': None
             }
             
             self.game_state = None
@@ -199,7 +203,12 @@ def create_tournament_dqn_agent(original_agent, name_suffix=""):
     
     return tournament_agent
 
-def determine_dqn_configuration(buy_model_path, upgrade_model_path, downgrade_model_path, pay_fine_model_path):
+def determine_dqn_configuration(
+    buy_model_path,
+    upgrade_model_path, 
+    downgrade_model_path,
+    pay_fine_model_path,
+    escape_jail_card_model_path):
     """
     Dynamically determine DQN configuration based on provided model paths.
     
@@ -217,7 +226,8 @@ def determine_dqn_configuration(buy_model_path, upgrade_model_path, downgrade_mo
         'buy_property',
         'get_upgrading_suggestions', 
         'get_downgrading_suggestions',
-        'should_pay_get_out_of_jail_fine'
+        'should_pay_get_out_of_jail_fine',
+        'should_use_escape_jail_card'
     ]
     
     # Map model paths to methods
@@ -225,9 +235,10 @@ def determine_dqn_configuration(buy_model_path, upgrade_model_path, downgrade_mo
         'buy_property': buy_model_path,
         'get_upgrading_suggestions': upgrade_model_path,
         'get_downgrading_suggestions': downgrade_model_path,
-        'should_pay_get_out_of_jail_fine': pay_fine_model_path
+        'should_pay_get_out_of_jail_fine': pay_fine_model_path,
+        'should_use_escape_jail_card': escape_jail_card_model_path,
     }
-    
+
     # Configure DQN methods and defaults based on model availability
     dqn_methods = {}
     can_use_defaults_methods = {}
@@ -252,6 +263,7 @@ def run_dqn_tournament(
         upgrade_model_path: str,
         downgrade_model_path: str,
         pay_fine_model_path: str,
+        escape_jail_card_model_path: str,
         config):
     """
     Run a tournament including the DQN agent against other agent types.
@@ -277,7 +289,11 @@ def run_dqn_tournament(
     
     # Determine DQN configuration dynamically
     dqn_methods, can_use_defaults_methods, active_methods = determine_dqn_configuration(
-        buy_model_path, upgrade_model_path, downgrade_model_path, pay_fine_model_path
+        buy_model_path, 
+        upgrade_model_path, 
+        downgrade_model_path, 
+        pay_fine_model_path, 
+        escape_jail_card_model_path  
     )
     
     # Check if at least one DQN method is being used
@@ -383,7 +399,8 @@ def run_dqn_tournament(
             'buy_property': buy_model_path,
             'upgrading': upgrade_model_path,
             'downgrading': downgrade_model_path,
-            'jail_fine': pay_fine_model_path
+            'jail_fine': pay_fine_model_path,
+            'escape_jail_card': escape_jail_card_model_path
         },
         'dqn_configuration': {
             method: 'DQN' if dqn_methods[method] is not None else 'Parent'
@@ -476,6 +493,8 @@ def main():
                        help='Path to saved model for downgrading suggestions (without suffixes). If not provided, uses parent class method.')
     parser.add_argument('--pay-fine-model-path', type=str, default=None,
                        help='Path to saved model for paying get out of jail fine decision (without suffixes). If not provided, uses parent class method.')
+    parser.add_argument('--escape-jail-card-model-path', type=str, default=None,
+                          help='Path to saved model for using escape jail card decision (without suffixes). If not provided, uses parent class method.')
     
     # Tournament type
     parser.add_argument('--two-player', action='store_true', default=True,
@@ -509,7 +528,13 @@ def main():
     modify_dqn_for_compatibility()
     
     # Check if at least one model path is provided
-    model_paths = [args.buy_model_path, args.upgrade_model_path, args.downgrade_model_path, args.pay_fine_model_path]
+    model_paths = [
+        args.buy_model_path, 
+        args.upgrade_model_path, 
+        args.downgrade_model_path, 
+        args.pay_fine_model_path, 
+        args.escape_jail_card_model_path
+    ]
     if not any(path is not None for path in model_paths):
         print("Error: At least one model path must be provided.")
         print("Available options: --buy-model-path, --upgrade-model-path, --downgrade-model-path, --pay-fine-model-path")
@@ -550,6 +575,7 @@ def main():
     print(f"  Upgrading model: {args.upgrade_model_path if args.upgrade_model_path else 'Parent class method'}")
     print(f"  Downgrading model: {args.downgrade_model_path if args.downgrade_model_path else 'Parent class method'}")
     print(f"  Pay fine model: {args.pay_fine_model_path if args.pay_fine_model_path else 'Parent class method'}")
+    print(f"  Escape jail card model: {args.escape_jail_card_model_path if args.escape_jail_card_model_path else 'Parent class method'}")
     
     # Start tournament
     print("\nStarting tournament with DQN agent...")
@@ -558,7 +584,8 @@ def main():
             buy_model_path=args.buy_model_path,
             upgrade_model_path=args.upgrade_model_path,
             downgrade_model_path=args.downgrade_model_path,
-            pay_fine_model_path=args.pay_fine_model_path, 
+            pay_fine_model_path=args.pay_fine_model_path,
+            escape_jail_card_model_path=args.escape_jail_card_model_path,
             config=config
         )
         
