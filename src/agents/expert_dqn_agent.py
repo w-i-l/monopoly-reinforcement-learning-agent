@@ -66,7 +66,8 @@ class DQNAgent(DefaultStrategicPlayer):
             'get_downgrading_suggestions': 0,
             'should_pay_get_out_of_jail_fine': 0,
             'should_use_escape_jail_card': 0,
-            'get_mortgaging_suggestions': 0
+            'get_mortgaging_suggestions': 0,
+            'get_unmortgaging_suggestions': 0
         }
         
         # Define which methods should use DQN and which ones inherit from parent
@@ -77,7 +78,8 @@ class DQNAgent(DefaultStrategicPlayer):
             'get_downgrading_suggestions': None,
             'should_pay_get_out_of_jail_fine': None,
             'should_use_escape_jail_card': None,
-            'get_mortgaging_suggestions': None
+            'get_mortgaging_suggestions': None,
+            'get_unmortgaging_suggestions': None
         }
         
         # Which method is currently being trained (if any)
@@ -90,7 +92,8 @@ class DQNAgent(DefaultStrategicPlayer):
             'get_downgrading_suggestions': 8,  # [8 color groups]
             'should_pay_get_out_of_jail_fine': 2,  # [don't pay, pay]
             'should_use_escape_jail_card': 2,  # [don't use card, use card]
-            'get_mortgaging_suggestions': 40  # [40 board positions - will filter to 22 mortgageable]
+            'get_mortgaging_suggestions': 40,  # [40 board positions yields better results than 22 - will filter to 22 mortgageable]
+            'get_unmortgaging_suggestions': 40  # [40 board positions - will filter to mortgaged properties]
         }
 
         self.can_use_defaults_methods = can_use_defaults_methods or {
@@ -99,7 +102,8 @@ class DQNAgent(DefaultStrategicPlayer):
             'get_downgrading_suggestions': False,
             'should_pay_get_out_of_jail_fine': False,
             'should_use_escape_jail_card': False,
-            'get_mortgaging_suggestions': False
+            'get_mortgaging_suggestions': False,
+            'get_unmortgaging_suggestions': False
         }
         
         # Network dictionaries to hold separate networks for each decision
@@ -117,7 +121,8 @@ class DQNAgent(DefaultStrategicPlayer):
             'get_downgrading_suggestions': deque(maxlen=memory_size),
             'should_pay_get_out_of_jail_fine': deque(maxlen=memory_size),
             'should_use_escape_jail_card': deque(maxlen=memory_size),
-            'get_mortgaging_suggestions': deque(maxlen=memory_size)
+            'get_mortgaging_suggestions': deque(maxlen=memory_size),
+            'get_unmortgaging_suggestions': deque(maxlen=memory_size)
         }
         
         # For tracking decisions during a game
@@ -127,7 +132,8 @@ class DQNAgent(DefaultStrategicPlayer):
             'get_downgrading_suggestions': None,
             'should_pay_get_out_of_jail_fine': None,
             'should_use_escape_jail_card': None,
-            'get_mortgaging_suggestions': None
+            'get_mortgaging_suggestions': None,
+            'get_unmortgaging_suggestions': None
         }
         
         # Game state reference
@@ -745,6 +751,106 @@ class DQNAgent(DefaultStrategicPlayer):
                         # Board not that dangerous, maybe missed opportunity
                         if prev_cards > 1:
                             base_reward -= 0.05  # Had cards to spare, could have used one
+
+            elif decision_type == 'get_unmortgaging_suggestions':
+                # For unmortgaging, focus on income restoration and strategic property reactivation
+                base_reward = normalized_change * 1.1  # Slightly higher multiplier since we're restoring assets
+                
+                # Cash situation analysis
+                prev_cash = game_state.player_balances[player]
+                current_cash = next_game_state.player_balances[player]
+                cash_decrease = prev_cash - current_cash
+                
+                # Count unmortgaged properties
+                prev_mortgaged = len([p for p in game_state.properties[player] if p in game_state.mortgaged_properties])
+                current_mortgaged = len([p for p in next_game_state.properties[player] if p in next_game_state.mortgaged_properties])
+                properties_unmortgaged = prev_mortgaged - current_mortgaged
+                
+                if properties_unmortgaged > 0:
+                    # Properties were unmortgaged
+                    if prev_cash > 800:  # Had plenty of cash
+                        base_reward += 0.3  # Good decision to restore income
+                    elif prev_cash > 500:  # Moderate cash
+                        base_reward += 0.2  # Reasonable decision
+                    elif prev_cash > 300:  # Lower cash but still feasible
+                        base_reward += 0.1  # Cautious but reasonable
+                    else:
+                        # Low cash - unmortgaging might be risky
+                        base_reward -= 0.1  # Small penalty
+                    
+                    # Bonus for restoring high-value properties
+                    for prop in game_state.mortgaged_properties:
+                        if prop in game_state.properties[player] and prop not in next_game_state.mortgaged_properties:
+                            # This property was just unmortgaged
+                            if isinstance(prop, Property):
+                                if prop.group in [PropertyGroup.ORANGE, PropertyGroup.RED]:
+                                    # High-traffic groups - bonus for unmortgaging
+                                    base_reward += 0.12
+                                elif prop.group in [PropertyGroup.GREEN, PropertyGroup.BLUE]:
+                                    # High-rent groups - bonus for unmortgaging
+                                    base_reward += 0.1
+                                    
+                                # Check if this completes/restores a monopoly
+                                group_properties = game_state.board.get_properties_by_group(prop.group)
+                                if all(p in game_state.properties[player] for p in group_properties):
+                                    # All properties in group owned - check if all are now unmortgaged
+                                    group_unmortgaged = all(p not in next_game_state.mortgaged_properties 
+                                                          for p in group_properties if p in next_game_state.properties[player])
+                                    if group_unmortgaged:
+                                        # Fully restored monopoly - significant bonus
+                                        base_reward += 0.25
+                            elif isinstance(prop, Railway):
+                                # Railways - moderate bonus
+                                base_reward += 0.08
+                            elif isinstance(prop, Utility):
+                                # Utilities - small bonus
+                                base_reward += 0.05
+                    
+                    # Penalty for spending too much cash relative to available funds
+                    if cash_decrease > prev_cash * 0.6:
+                        # Spent more than 60% of cash - might be risky
+                        base_reward -= 0.15
+                    elif cash_decrease > prev_cash * 0.4:
+                        # Spent more than 40% of cash - moderate concern
+                        base_reward -= 0.08
+                
+                # Reward for strategic cash management
+                if current_cash > 500:
+                    # Maintained good cash reserves after unmortgaging
+                    base_reward += 0.1
+                elif current_cash < 200:
+                    # Left with very little cash - risky
+                    base_reward -= 0.2
+                
+                # Future income potential bonus
+                # Calculate potential rent from unmortgaged properties
+                potential_income_increase = 0
+                for prop in game_state.mortgaged_properties:
+                    if prop in game_state.properties[player] and prop not in next_game_state.mortgaged_properties:
+                        # This property was unmortgaged - estimate income increase
+                        if isinstance(prop, Property):
+                            # Check if part of monopoly for rent calculation
+                            group_properties = game_state.board.get_properties_by_group(prop.group)
+                            if all(p in game_state.properties[player] for p in group_properties):
+                                # Monopoly rent
+                                potential_income_increase += prop.full_group_rent * 0.1  # Weight factor
+                            else:
+                                # Base rent
+                                potential_income_increase += prop.base_rent * 0.1
+                        elif isinstance(prop, Railway):
+                            # Estimate railway rent based on how many we own
+                            owned_railways = sum(1 for r in game_state.board.get_railways() 
+                                               if r in game_state.properties[player])
+                            if owned_railways > 0:
+                                potential_income_increase += prop.rent[min(owned_railways-1, 3)] * 0.08
+                        elif isinstance(prop, Utility):
+                            # Estimate utility rent
+                            potential_income_increase += 35 * 0.05  # Average utility rent
+                
+                # Normalize and add income bonus
+                income_bonus = min(potential_income_increase / 50.0, 0.2)  # Cap at 0.2
+                base_reward += income_bonus
+                    
             else:
                 # Default case
                 base_reward = normalized_change
@@ -1457,6 +1563,148 @@ class DQNAgent(DefaultStrategicPlayer):
             
             # Fall back to parent implementation
             return super().get_mortgaging_suggestions(game_state)
+        
+
+    def get_unmortgaging_suggestions(self, game_state: GameState) -> List[Tile]:
+        """
+        Decide which properties to unmortgage using the DQN policy.
+        
+        Args:
+            game_state: Current game state
+            
+        Returns:
+            List of Tile objects to unmortgage
+        """
+        # Check if we should use DQN for this method
+        method = 'get_unmortgaging_suggestions'
+        if method not in self.q_networks:
+            if not self.can_use_defaults_methods[method]:
+                print(f"Using parent class implementation for {method}")
+                print(self.q_networks)
+                print(self.can_use_defaults_methods)
+                exit(-1)
+            # Use parent class implementation
+            return super().get_unmortgaging_suggestions(game_state)
+        
+        if super().get_unmortgaging_suggestions(game_state) == []:
+            # If parent implementation returns empty, we can't unmortgage
+            return []
+        
+        # Update epsilon counter for this method
+        if method not in self.epsilon_counter:
+            self.epsilon_counter[method] = 0
+        self.epsilon_counter[method] += 1
+
+        try:
+            # Encode the state
+            state = self.encode_state(game_state)
+            state_tensor = tf.convert_to_tensor([state], dtype=tf.float32)
+            
+            # Get Q-values for all board positions
+            q_values = self.q_networks[method](state_tensor)[0].numpy()
+            
+            # Get all unmortgageable properties (owned by us and currently mortgaged)
+            unmortgageable_properties = []
+            for prop in game_state.properties[self]:
+                if prop in game_state.mortgaged_properties:
+                    # Additional validation - check if property can actually be unmortgaged
+                    if not GameValidation.validate_unmortgage_property(game_state, self, prop):
+                        unmortgageable_properties.append(prop)
+            
+            if not unmortgageable_properties:
+                # No properties can be unmortgaged
+                if self.training and (method == self.active_training_method):
+                    # Store decision for training (no unmortgage action)
+                    self.current_decisions[method] = {
+                        'state': state,
+                        'action': -1,  # No action
+                        'game_state': game_state,
+                        'unmortgageable_properties': []
+                    }
+                return []
+            
+            # In training mode, use epsilon-greedy policy
+            selected_properties = []
+            if self.training and (method == self.active_training_method):
+                if np.random.random() < self.epsilon:
+                    # Random selection - choose 0-2 random properties to unmortgage
+                    num_to_select = np.random.randint(0, min(3, len(unmortgageable_properties) + 1))
+                    if num_to_select > 0:
+                        selected_properties = np.random.choice(unmortgageable_properties, 
+                                                             size=num_to_select, 
+                                                             replace=False).tolist()
+                    action_indices = [prop.id for prop in selected_properties] if selected_properties else [-1]
+                else:
+                    # Use Q-values to select properties
+                    # Get Q-values for unmortgageable properties and select top ones above threshold
+                    property_q_values = []
+                    for prop in unmortgageable_properties:
+                        if prop.id < len(q_values):
+                            property_q_values.append((prop, q_values[prop.id]))
+                    
+                    # Sort by Q-value (highest first) and select properties above threshold
+                    property_q_values.sort(key=lambda x: x[1], reverse=True)
+                    if property_q_values:
+                        threshold = np.mean([pq[1] for pq in property_q_values])
+                        
+                        for prop, q_val in property_q_values:
+                            if q_val > threshold and len(selected_properties) < 2:  # Limit to 2 properties
+                                selected_properties.append(prop)
+                    
+                    action_indices = [prop.id for prop in selected_properties] if selected_properties else [-1]
+                
+                # Store the current decision for future reward
+                self.current_decisions[method] = {
+                    'state': state,
+                    'action': action_indices[0] if action_indices != [-1] else -1,
+                    'game_state': game_state,
+                    'unmortgageable_properties': unmortgageable_properties,
+                    'selected_properties': selected_properties
+                }
+                
+                # Decay epsilon
+                if self.epsilon_counter[method] % self.epsilon_update_freq == 0:
+                    self.epsilon = max(self.epsilon_end, self.epsilon * self.epsilon_decay)
+            else:
+                # In evaluation mode, select properties with highest Q-values
+                property_q_values = []
+                for prop in unmortgageable_properties:
+                    if prop.id < len(q_values):
+                        property_q_values.append((prop, q_values[prop.id]))
+                
+                # Sort by Q-value (highest first) and select top properties above threshold
+                property_q_values.sort(key=lambda x: x[1], reverse=True)
+                if property_q_values:
+                    threshold = np.mean([pq[1] for pq in property_q_values])
+                    
+                    for prop, q_val in property_q_values:
+                        if q_val > threshold and len(selected_properties) < 2:  # Limit to 2 properties
+                            selected_properties.append(prop)
+            
+            return selected_properties
+        
+        except Exception as e:
+            print(f"Error in get_unmortgaging_suggestions: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Fallback with penalty in training mode
+            if self.training and (method == self.active_training_method):
+                try:
+                    state = self.encode_state(game_state)
+                    action = -1  # No unmortgage
+                    self.memory[method].append((
+                        state,
+                        action,
+                        -0.5,  # Penalty for error
+                        state,  # Same state as next_state since we don't have a real transition
+                        True  # Treat as a terminal state
+                    ))
+                except:
+                    pass
+            
+            # Fall back to parent implementation
+            return super().get_unmortgaging_suggestions(game_state)
 
         
     def update_decision(self, method: str, next_game_state: GameState, done: bool = False):

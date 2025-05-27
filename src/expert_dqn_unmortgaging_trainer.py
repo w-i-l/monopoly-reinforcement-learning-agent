@@ -25,9 +25,9 @@ from models.property_group import PropertyGroup
 # Set TensorFlow to only show errors
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-def play_single_game_for_mortgaging(agent_types, max_turns=200, dqn_observer=None):
+def play_single_game_for_unmortgaging(agent_types, max_turns=200, dqn_observer=None):
     """
-    Play a single game and collect mortgaging experiences.
+    Play a single game and collect unmortgaging experiences.
     
     Args:
         agent_types: List of agent types to use (not instances)
@@ -46,30 +46,28 @@ def play_single_game_for_mortgaging(agent_types, max_turns=200, dqn_observer=Non
     # Game tracking
     turn_counter = 0
     active_players = len(players)
-    mortgaging_decisions = []
+    unmortgaging_decisions = []
     
     try:
         while active_players > 1 and turn_counter < max_turns:
             current_player_idx = game_manager.game_state.current_player_index
             current_player = players[current_player_idx]
             
-            # Record state before turn for mortgaging decisions
+            # Record state before turn for unmortgaging decisions
             if dqn_observer:
                 try:
-                    # Check if player has properties that can be mortgaged
-                    mortgageable_properties = []
-                    for tile in game_manager.game_state.board.tiles:
-                        if (isinstance(tile, (Property, Railway, Utility)) and 
-                            tile in game_manager.game_state.properties[current_player] and 
-                            tile not in game_manager.game_state.mortgaged_properties):
-                            mortgageable_properties.append(tile)
+                    # Check if player has properties that can be unmortgaged
+                    unmortgageable_properties = []
+                    for prop in game_manager.game_state.properties[current_player]:
+                        if prop in game_manager.game_state.mortgaged_properties:
+                            unmortgageable_properties.append(prop)
                     
-                    # Only record decisions when player has mortgageable properties
-                    if mortgageable_properties:
+                    # Only record decisions when player has mortgaged properties
+                    if unmortgageable_properties:
                         # Encode current state
                         current_state = dqn_observer.encode_state(game_manager.game_state)
                         
-                        # Get the player's mortgaging decision using a temporary DefaultStrategicPlayer
+                        # Get the player's unmortgaging decision using a temporary DefaultStrategicPlayer
                         # This way we collect data on how the strategic agent makes decisions
                         temp_player = DefaultStrategicPlayer(f"Temp_{current_player.name}")
                         # Copy current player's properties and position to temp player
@@ -82,15 +80,15 @@ def play_single_game_for_mortgaging(agent_types, max_turns=200, dqn_observer=Non
                         temp_player._calculate_property_values(game_manager.game_state)
                         
                         # Get suggestions from the temp player
-                        mortgage_suggestions = temp_player.get_mortgaging_suggestions(game_manager.game_state)
+                        unmortgage_suggestions = temp_player.get_unmortgaging_suggestions(game_manager.game_state)
                         
                         # Convert decision to action indices
-                        if mortgage_suggestions:
+                        if unmortgage_suggestions:
                             # Use the first property ID as action (simplified for training)
-                            action = mortgage_suggestions[0].id
-                            selected_properties = mortgage_suggestions
+                            action = unmortgage_suggestions[0].id
+                            selected_properties = unmortgage_suggestions
                         else:
-                            action = -1  # No mortgage
+                            action = -1  # No unmortgage
                             selected_properties = []
                         
                         # Remove temp player from game state to avoid side effects
@@ -101,17 +99,18 @@ def play_single_game_for_mortgaging(agent_types, max_turns=200, dqn_observer=Non
                         if temp_player in game_manager.game_state.player_balances:
                             del game_manager.game_state.player_balances[temp_player]
                         
-                        mortgaging_decisions.append({
+                        # Record unmortgaging decision
+                        unmortgaging_decisions.append({
                             'state': current_state,
                             'action': action,
                             'player': current_player,
                             'turn': turn_counter,
-                            'mortgageable_properties': mortgageable_properties,
+                            'unmortgageable_properties': unmortgageable_properties,
                             'selected_properties': selected_properties,
                             'cash_before': game_manager.game_state.player_balances[current_player]
                         })
                 except Exception as e:
-                    print(f"Error recording mortgaging decision: {e}")
+                    print(f"Error recording unmortgaging decision: {e}")
                     import traceback
                     traceback.print_exc()
             
@@ -150,86 +149,107 @@ def play_single_game_for_mortgaging(agent_types, max_turns=200, dqn_observer=Non
             'balance': game_manager.game_state.player_balances[player]
         }
     
-    # Calculate rewards for mortgaging decisions
-    for decision in mortgaging_decisions:
+    # Calculate rewards for unmortgaging decisions
+    for decision in unmortgaging_decisions:
         player = decision['player']
         outcome = outcomes.get(player.name, {'net_worth': 0, 'winner': False, 'balance': 0})
         
-        # Reward calculation for mortgaging decisions - focus on liquidity management and strategic asset conversion
+        # Reward calculation for unmortgaging decisions - focus on income restoration and strategic reactivation
         if outcome['winner']:
             decision['reward'] = 1.0
         elif outcome['balance'] < 0:
-            # Bankruptcy - mortgaging might have delayed it, so moderate penalty
-            decision['reward'] = -0.6
+            # Bankruptcy - unmortgaging might have been too aggressive with cash spending
+            decision['reward'] = -0.7
         else:
             # Base reward on net worth
             net_worth_reward = np.clip(outcome['net_worth'] / 3000.0 - 0.5, -1.0, 1.0)
             
-            # Bonus for liquidity and cash management
-            cash_management_bonus = 0.0
+            # Bonus for income restoration and strategic property management
+            income_restoration_bonus = 0.0
             
             # Consider cash situation at time of decision
             cash_before = decision['cash_before']
             action = decision['action']
             selected_properties = decision['selected_properties']
             
-            if action != -1 and selected_properties:  # Properties were mortgaged
-                # Calculate approximate cash gained from mortgaging
-                cash_gained = sum(prop.mortgage for prop in selected_properties)
+            if action != -1 and selected_properties:  # Properties were unmortgaged
+                # Calculate approximate cash spent on unmortgaging
+                cash_spent = sum(prop.buyback_price for prop in selected_properties)
                 
-                if cash_before < 200:
-                    # Very low cash - mortgaging was likely necessary
-                    cash_management_bonus = 0.4
-                elif cash_before < 500:
-                    # Moderate cash - reasonable decision
-                    cash_management_bonus = 0.2
-                elif cash_before < 1000:
-                    # Good cash - might be strategic
-                    cash_management_bonus = 0.1
+                if cash_before > 1000:
+                    # High cash - good decision to restore income
+                    income_restoration_bonus = 0.4
+                elif cash_before > 600:
+                    # Good cash - reasonable decision
+                    income_restoration_bonus = 0.3
+                elif cash_before > 400:
+                    # Moderate cash - could be strategic
+                    income_restoration_bonus = 0.2
+                elif cash_before > 200:
+                    # Lower cash - might be risky but could be necessary
+                    income_restoration_bonus = 0.1
                 else:
-                    # High cash - mortgaging might not be necessary
-                    cash_management_bonus = -0.1
+                    # Very low cash - probably too risky
+                    income_restoration_bonus = -0.2
                 
-                # Bonus for raising significant cash relative to original amount
-                if cash_gained > cash_before * 0.5:
-                    cash_management_bonus += 0.15
-                elif cash_gained > cash_before * 0.25:
-                    cash_management_bonus += 0.1
-                
-                # Penalty for mortgaging high-value properties unnecessarily
+                # Bonus for unmortgaging high-value properties
                 for prop in selected_properties:
                     if isinstance(prop, Property):
                         if prop.group in [PropertyGroup.ORANGE, PropertyGroup.RED]:
-                            # High-traffic properties - penalty for mortgaging
-                            cash_management_bonus -= 0.05
+                            # High-traffic properties - bonus for restoring
+                            income_restoration_bonus += 0.1
                         elif prop.group in [PropertyGroup.GREEN, PropertyGroup.BLUE]:
-                            # High-rent properties - penalty for mortgaging
-                            cash_management_bonus -= 0.04
-            else:  # No properties were mortgaged
-                if cash_before < 100:
-                    # Very low cash but didn't mortgage - might have missed opportunity
-                    cash_management_bonus = -0.2
-                elif cash_before > 800:
-                    # High cash - good decision not to mortgage
-                    cash_management_bonus = 0.1
+                            # High-rent properties - bonus for restoring
+                            income_restoration_bonus += 0.08
+                        
+                        # Extra bonus if this completes a monopoly restoration
+                        # (This is approximated since we don't track the exact game progression)
+                        income_restoration_bonus += 0.05
+                    elif isinstance(prop, Railway):
+                        # Railways - moderate bonus
+                        income_restoration_bonus += 0.06
+                    elif isinstance(prop, Utility):
+                        # Utilities - small bonus
+                        income_restoration_bonus += 0.04
+                
+                # Penalty for spending too much relative to available cash
+                if cash_spent > cash_before * 0.7:
+                    # Spent more than 70% of cash - very risky
+                    income_restoration_bonus -= 0.3
+                elif cash_spent > cash_before * 0.5:
+                    # Spent more than 50% of cash - risky
+                    income_restoration_bonus -= 0.15
+                elif cash_spent > cash_before * 0.3:
+                    # Spent more than 30% of cash - moderate concern
+                    income_restoration_bonus -= 0.05
+                
+            else:  # No properties were unmortgaged
+                if cash_before > 800:
+                    # High cash but didn't unmortgage - might have missed opportunity
+                    income_restoration_bonus = -0.1
+                elif cash_before < 300:
+                    # Low cash - good decision not to spend on unmortgaging
+                    income_restoration_bonus = 0.1
             
-            # Final balance consideration
-            if outcome['balance'] > 1000:
-                cash_management_bonus += 0.1  # Good cash management overall
+            # Final balance consideration - proxy for long-term income benefits
+            if outcome['balance'] > 800:
+                income_restoration_bonus += 0.15  # Good cash management and income
+            elif outcome['balance'] > 400:
+                income_restoration_bonus += 0.1   # Reasonable outcome
             elif outcome['balance'] < 200:
-                cash_management_bonus -= 0.1  # Poor cash management
+                income_restoration_bonus -= 0.1   # Poor cash management
             
-            decision['reward'] = net_worth_reward + cash_management_bonus
+            decision['reward'] = net_worth_reward + income_restoration_bonus
     
     return {
         'turns': turn_counter,
         'outcomes': outcomes,
-        'mortgaging_decisions': mortgaging_decisions
+        'unmortgaging_decisions': unmortgaging_decisions
     }
 
-def collect_mortgaging_experiences(num_games=100, use_multiprocessing=True, num_processes=None):
+def collect_unmortgaging_experiences(num_games=100, use_multiprocessing=True, num_processes=None):
     """
-    Collect mortgaging decision experiences from games between various agent types.
+    Collect unmortgaging decision experiences from games between various agent types.
     
     Args:
         num_games: Number of games to play
@@ -237,9 +257,9 @@ def collect_mortgaging_experiences(num_games=100, use_multiprocessing=True, num_
         num_processes: Number of processes to use
         
     Returns:
-        List of mortgaging decision experiences
+        List of unmortgaging decision experiences
     """
-    print(f"Collecting mortgaging experiences from {num_games} games...")
+    print(f"Collecting unmortgaging experiences from {num_games} games...")
     
     # Agent types to use
     agent_types = [
@@ -279,32 +299,32 @@ def collect_mortgaging_experiences(num_games=100, use_multiprocessing=True, num_
         
         # Start multiprocessing pool
         with mp.Pool(processes=num_processes) as pool:
-            results = pool.map(_collect_mortgaging_games_worker, process_args)
+            results = pool.map(_collect_unmortgaging_games_worker, process_args)
         
         # Combine results
-        all_mortgaging_decisions = []
+        all_unmortgaging_decisions = []
         for result in results:
-            all_mortgaging_decisions.extend(result)
+            all_unmortgaging_decisions.extend(result)
         
-        return all_mortgaging_decisions
+        return all_unmortgaging_decisions
     else:
         # Single process collection
-        all_mortgaging_decisions = []
+        all_unmortgaging_decisions = []
         
         for i in tqdm(range(num_games), desc="Playing games"):
             # Select random agent types for this game
             game_agents = random.choices(agent_types, k=2)
             
             # Play a game
-            game_result = play_single_game_for_mortgaging(game_agents, dqn_observer=dqn_observer)
+            game_result = play_single_game_for_unmortgaging(game_agents, dqn_observer=dqn_observer)
             
-            # Add mortgaging decisions to collection
-            if 'mortgaging_decisions' in game_result:
-                all_mortgaging_decisions.extend(game_result['mortgaging_decisions'])
+            # Add unmortgaging decisions to collection
+            if 'unmortgaging_decisions' in game_result:
+                all_unmortgaging_decisions.extend(game_result['unmortgaging_decisions'])
         
-        return all_mortgaging_decisions
+        return all_unmortgaging_decisions
 
-def _collect_mortgaging_games_worker(args):
+def _collect_unmortgaging_games_worker(args):
     """
     Worker function for parallel game collection.
     
@@ -312,7 +332,7 @@ def _collect_mortgaging_games_worker(args):
         args: Tuple of (num_games, agent_types, process_id)
         
     Returns:
-        List of mortgaging decisions from games
+        List of unmortgaging decisions from games
     """
     num_games, agent_types, process_id = args
     
@@ -324,7 +344,7 @@ def _collect_mortgaging_games_worker(args):
         dqn_methods={}  # Use parent class methods only
     )
     
-    mortgaging_decisions = []
+    unmortgaging_decisions = []
     
     try:
         for i in tqdm(range(num_games), desc=f"Process {process_id}", position=process_id):
@@ -333,11 +353,11 @@ def _collect_mortgaging_games_worker(args):
                 game_agents = random.choices(agent_types, k=2)
                 
                 # Play a game
-                game_result = play_single_game_for_mortgaging(game_agents, dqn_observer=dqn_observer)
+                game_result = play_single_game_for_unmortgaging(game_agents, dqn_observer=dqn_observer)
                 
-                # Add mortgaging decisions to collection
-                if 'mortgaging_decisions' in game_result:
-                    mortgaging_decisions.extend(game_result['mortgaging_decisions'])
+                # Add unmortgaging decisions to collection
+                if 'unmortgaging_decisions' in game_result:
+                    unmortgaging_decisions.extend(game_result['unmortgaging_decisions'])
                     
             except Exception as e:
                 print(f"Process {process_id}, Game {i} error: {e}")
@@ -350,25 +370,25 @@ def _collect_mortgaging_games_worker(args):
         import traceback
         traceback.print_exc()
     
-    print(f"Process {process_id} collected {len(mortgaging_decisions)} mortgaging decisions")
-    return mortgaging_decisions
+    print(f"Process {process_id} collected {len(unmortgaging_decisions)} unmortgaging decisions")
+    return unmortgaging_decisions
 
-def prepare_mortgaging_experiences_for_training(mortgaging_decisions):
+def prepare_unmortgaging_experiences_for_training(unmortgaging_decisions):
     """
-    Convert mortgaging decisions into training examples.
+    Convert unmortgaging decisions into training examples.
     
     Args:
-        mortgaging_decisions: List of mortgaging decision dictionaries
+        unmortgaging_decisions: List of unmortgaging decision dictionaries
         
     Returns:
         List of experience tuples (state, action, reward, next_state, done)
     """
-    if not mortgaging_decisions:
+    if not unmortgaging_decisions:
         return []
     
     experiences = []
     
-    for decision in mortgaging_decisions:
+    for decision in unmortgaging_decisions:
         # Basic structure of an experience
         state = decision['state']
         action = decision['action']  # Property ID or -1 for no action
@@ -384,9 +404,9 @@ def prepare_mortgaging_experiences_for_training(mortgaging_decisions):
     
     return experiences
 
-def pretrain_dqn_for_mortgaging(dqn_agent, experiences, batch_size=32, epochs=5):
+def pretrain_dqn_for_unmortgaging(dqn_agent, experiences, batch_size=32, epochs=5):
     """
-    Pretrain the DQN agent for mortgaging decisions from collected experiences.
+    Pretrain the DQN agent for unmortgaging decisions from collected experiences.
     
     Args:
         dqn_agent: DQN agent to train
@@ -397,7 +417,7 @@ def pretrain_dqn_for_mortgaging(dqn_agent, experiences, batch_size=32, epochs=5)
     Returns:
         Training statistics
     """
-    print(f"Pretraining DQN agent for mortgaging on {len(experiences)} experiences...")
+    print(f"Pretraining DQN agent for unmortgaging on {len(experiences)} experiences...")
     
     # Initialize training stats
     stats = {
@@ -406,7 +426,7 @@ def pretrain_dqn_for_mortgaging(dqn_agent, experiences, batch_size=32, epochs=5)
     
     # Add all experiences to agent's memory
     for exp in experiences:
-        dqn_agent.memory['get_mortgaging_suggestions'].append(exp)
+        dqn_agent.memory['get_unmortgaging_suggestions'].append(exp)
     
     # Train for multiple epochs
     for epoch in range(epochs):
@@ -421,7 +441,7 @@ def pretrain_dqn_for_mortgaging(dqn_agent, experiences, batch_size=32, epochs=5)
         # Train on batches
         for _ in tqdm(range(num_batches), desc="Training batches"):
             # Train on a batch and get loss
-            loss = dqn_agent.train_on_batch('get_mortgaging_suggestions')
+            loss = dqn_agent.train_on_batch('get_unmortgaging_suggestions')
             if loss is not None:
                 epoch_loss.append(loss)
         
@@ -556,7 +576,7 @@ def play_evaluation_games(dqn_agent, num_games=50, max_turns=200):
         'opponent_stats': stats
     }
 
-def train_dqn_mortgaging_through_gameplay(
+def train_dqn_unmortgaging_through_gameplay(
         dqn_agent: DQNAgent, 
         num_games=500, 
         max_turns=200, 
@@ -564,10 +584,10 @@ def train_dqn_mortgaging_through_gameplay(
         evaluation_games=350,
         evaluation_interval=100, 
         save_interval=150, 
-        save_path='models/mortgaging'
+        save_path='models/unmortgaging'
         ):
     """
-    Train the DQN agent's mortgaging decision through actual gameplay.
+    Train the DQN agent's unmortgaging decision through actual gameplay.
     
     Args:
         dqn_agent: DQN agent to train
@@ -584,7 +604,7 @@ def train_dqn_mortgaging_through_gameplay(
     # Create directory for saving models
     os.makedirs(save_path, exist_ok=True)
     
-    print(f"Training DQN agent's mortgaging decisions through {num_games} games of gameplay...")
+    print(f"Training DQN agent's unmortgaging decisions through {num_games} games of gameplay...")
     
     # Opponents
     opponents = [
@@ -634,9 +654,9 @@ def train_dqn_mortgaging_through_gameplay(
                 
                 # If it's the DQN agent's turn
                 if current_player == dqn_agent:
-                    # Update previous mortgaging decision with current state
-                    if dqn_agent.current_decisions['get_mortgaging_suggestions']:
-                        dqn_agent.update_decision('get_mortgaging_suggestions', game_manager.game_state)
+                    # Update previous unmortgaging decision with current state
+                    if dqn_agent.current_decisions['get_unmortgaging_suggestions']:
+                        dqn_agent.update_decision('get_unmortgaging_suggestions', game_manager.game_state)
                 
                 # Play a turn
                 try:
@@ -674,9 +694,9 @@ def train_dqn_mortgaging_through_gameplay(
             stats['win_rate'].append(np.mean(wins_window))
             stats['epsilon'].append(dqn_agent.epsilon)
             
-            # Finalize any pending mortgaging decision
-            if dqn_agent.current_decisions['get_mortgaging_suggestions']:
-                dqn_agent.update_decision('get_mortgaging_suggestions', game_manager.game_state, done=True)
+            # Finalize any pending unmortgaging decision
+            if dqn_agent.current_decisions['get_unmortgaging_suggestions']:
+                dqn_agent.update_decision('get_unmortgaging_suggestions', game_manager.game_state, done=True)
             
             # Evaluate periodically
             if (game_idx + 1) % evaluation_interval == 0:
@@ -686,8 +706,8 @@ def train_dqn_mortgaging_through_gameplay(
             
             # Save periodically
             if (game_idx + 1) % save_interval == 0:
-                model_path = os.path.join(save_path, f"dqn_mortgaging_game_{game_idx+1}")
-                dqn_agent.save_model_for_method('get_mortgaging_suggestions', model_path)
+                model_path = os.path.join(save_path, f"dqn_unmortgaging_game_{game_idx+1}")
+                dqn_agent.save_model_for_method('get_unmortgaging_suggestions', model_path)
                 print(f"Model saved to {model_path}")
                 
                 # Plot and save stats
@@ -707,8 +727,8 @@ def train_dqn_mortgaging_through_gameplay(
             traceback.print_exc()
     
     # Save final model
-    final_model_path = os.path.join(save_path, "dqn_mortgaging_final")
-    dqn_agent.save_model_for_method('get_mortgaging_suggestions', final_model_path)
+    final_model_path = os.path.join(save_path, "dqn_unmortgaging_final")
+    dqn_agent.save_model_for_method('get_unmortgaging_suggestions', final_model_path)
     print(f"Final model saved to {final_model_path}")
     
     # Plot final stats
@@ -823,7 +843,7 @@ def plot_epsilon_decay(epsilon_config: EpsilonConfig) -> None:
     plt.grid()
     plt.show()
 
-def run_mortgaging_training_pipeline(
+def run_unmortgaging_training_pipeline(
         pretraining_iteration_games=1000, 
         pretraining_iteration_epochs=3, 
         pretraining_iterations=5, 
@@ -831,17 +851,18 @@ def run_mortgaging_training_pipeline(
         training_games=500, 
         max_turns=200,
         batch_size=32, 
-        save_path='models/mortgaging', 
+        save_path='models/unmortgaging', 
         load_path=None,
         property_buy_model_path=None,
         upgrading_model_path=None,
         downgrading_model_path=None,
+        mortgaging_model_path=None,
         jail_fine_model_path=None,
         escape_jail_card_model_path=None,
         epsilon_config=None
         ):
     """
-    Run the complete DQN training pipeline for mortgaging suggestions.
+    Run the complete DQN training pipeline for unmortgaging suggestions.
     
     Args:
         pretraining_iteration_games: Number of games for pretraining per iteration
@@ -852,10 +873,11 @@ def run_mortgaging_training_pipeline(
         max_turns: Maximum turns per game
         batch_size: Batch size for training
         save_path: Path to save models
-        load_path: Path to load pretrained mortgaging model (optional)
+        load_path: Path to load pretrained unmortgaging model (optional)
         property_buy_model_path: Path to load property buying model (optional)
         upgrading_model_path: Path to load upgrading model (optional)
         downgrading_model_path: Path to load downgrading model (optional)
+        mortgaging_model_path: Path to load mortgaging model (optional)
         jail_fine_model_path: Path to load jail fine model (optional)
         escape_jail_card_model_path: Path to load escape jail card model (optional)
         epsilon_config: Configuration for epsilon decay (optional)
@@ -864,7 +886,7 @@ def run_mortgaging_training_pipeline(
         Trained DQN agent and statistics
     """
     
-    print("Starting DQN mortgaging suggestions training pipeline")
+    print("Starting DQN unmortgaging suggestions training pipeline")
     start_time = time.time()
     
     # Configure which methods use DQN
@@ -872,9 +894,10 @@ def run_mortgaging_training_pipeline(
         'buy_property': property_buy_model_path,  # None means use parent class method
         'get_upgrading_suggestions': upgrading_model_path,  # None means use parent class method
         'get_downgrading_suggestions': downgrading_model_path,  # None means use parent class method
+        'get_mortgaging_suggestions': mortgaging_model_path,  # None means use parent class method
         'should_pay_get_out_of_jail_fine': jail_fine_model_path,  # None means use parent class method
         'should_use_escape_jail_card': escape_jail_card_model_path,  # None means use parent class method
-        'get_mortgaging_suggestions': load_path
+        'get_unmortgaging_suggestions': load_path
     }
     
     NUM_PROCESSES = 8
@@ -906,14 +929,15 @@ def run_mortgaging_training_pipeline(
         batch_size=batch_size,
         training=True,
         dqn_methods=dqn_methods,
-        active_training_method='get_mortgaging_suggestions',
+        active_training_method='get_unmortgaging_suggestions',
         can_use_defaults_methods= {
             'buy_property': property_buy_model_path is None,
             'get_upgrading_suggestions': upgrading_model_path is None,
             'get_downgrading_suggestions': downgrading_model_path is None,
+            'get_mortgaging_suggestions': mortgaging_model_path is None,
             'should_pay_get_out_of_jail_fine': jail_fine_model_path is None,
             'should_use_escape_jail_card': escape_jail_card_model_path is None,
-            'get_mortgaging_suggestions': False
+            'get_unmortgaging_suggestions': False
         }
     )
 
@@ -927,18 +951,18 @@ def run_mortgaging_training_pipeline(
     
     for i in tqdm(range(pretraining_iterations), desc="Training iterations"):
         # Step 1: Collect experiences from other agents
-        experiences = collect_mortgaging_experiences(
+        experiences = collect_unmortgaging_experiences(
             num_games=pretraining_iteration_games,
             use_multiprocessing=True
         )
         
         # Prepare experiences for training
-        training_data = prepare_mortgaging_experiences_for_training(experiences)
+        training_data = prepare_unmortgaging_experiences_for_training(experiences)
         
         # Step 2: Pretrain on collected experiences
         if training_data:
             print(f"Pretraining on {len(training_data)} experiences")
-            pretrain_stats = pretrain_dqn_for_mortgaging(
+            pretrain_stats = pretrain_dqn_for_unmortgaging(
                 dqn_agent,
                 training_data,
                 batch_size=batch_size,
@@ -946,8 +970,8 @@ def run_mortgaging_training_pipeline(
             )
             
             # Save pretrained model
-            pretrain_model_path = os.path.join(save_path, f"dqn_mortgaging_pretrained_{i+1}")
-            dqn_agent.save_model_for_method('get_mortgaging_suggestions', pretrain_model_path)
+            pretrain_model_path = os.path.join(save_path, f"dqn_unmortgaging_pretrained_{i+1}")
+            dqn_agent.save_model_for_method('get_unmortgaging_suggestions', pretrain_model_path)
             print(f"Pretrained model saved to {pretrain_model_path}")
             
             # Plot pretraining stats
@@ -967,7 +991,7 @@ def run_mortgaging_training_pipeline(
 
     # Step 4: Train through gameplay    
     print("Starting training through gameplay")
-    gameplay_stats = train_dqn_mortgaging_through_gameplay(
+    gameplay_stats = train_dqn_unmortgaging_through_gameplay(
         dqn_agent,
         num_games=training_games,
         max_turns=max_turns,
@@ -1002,7 +1026,7 @@ if __name__ == "__main__":
     print(f"Update frequency for epsilon: {calculate_epsilon_update_freq(epsilon_config)}")
 
     # Run the training pipeline with other methods using previously trained models
-    agent, gameplay_stats = run_mortgaging_training_pipeline(
+    agent, gameplay_stats = run_unmortgaging_training_pipeline(
         pretraining_iteration_games=5_000,  # Start with a reasonable number of games
         pretraining_iteration_epochs=1,
         pretraining_iterations=5,
@@ -1010,12 +1034,13 @@ if __name__ == "__main__":
         evaluation_games=0,
         max_turns=500,
         batch_size=64,
-        save_path='saved_models/dqn/mortgaging/v2/',
+        save_path='saved_models/dqn/unmortgaging/v1/',
         property_buy_model_path='saved_models/dqn/should_buy/v6/dqn_agent_final',  # Use trained buy property model
         upgrading_model_path="saved_models/dqn/upgrading/v5/dqn_upgrading_final",  # Use trained upgrading model
         downgrading_model_path='saved_models/dqn/downgrade/v2/dqn_downgrading_final',  # Use trained downgrading model
         jail_fine_model_path='saved_models/dqn/jail_fine/v2/dqn_agent_final',  # Use parent class for jail fine method
         escape_jail_card_model_path='saved_models/dqn/escape_jail_card/v2/dqn_escape_jail_card_final',  # Use trained escape jail card model
+        mortgaging_model_path='saved_models/dqn/mortgaging/v1/dqn_mortgaging_final',
         epsilon_config=epsilon_config,
     )
     
