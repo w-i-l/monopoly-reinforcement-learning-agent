@@ -88,7 +88,8 @@ def modify_dqn_for_compatibility():
                 'get_upgrading_suggestions': 8,
                 'get_downgrading_suggestions': 8,
                 'should_pay_get_out_of_jail_fine': 2,
-                'should_use_escape_jail_card': 2
+                'should_use_escape_jail_card': 2,
+                "get_mortgaging_suggestions": 22,
             })
             
             # CRITICAL FIX: Use stored configuration instead of parameters
@@ -113,7 +114,8 @@ def modify_dqn_for_compatibility():
                 'get_upgrading_suggestions': 0,
                 'get_downgrading_suggestions': 0,
                 'should_pay_get_out_of_jail_fine': 0,
-                'should_use_escape_jail_card': 0
+                'should_use_escape_jail_card': 0,
+                'get_mortgaging_suggestions': 0
             }
             
             # Use class-level cached networks if available
@@ -134,7 +136,8 @@ def modify_dqn_for_compatibility():
                 'get_upgrading_suggestions': deque(maxlen=10000),
                 'get_downgrading_suggestions': deque(maxlen=10000),
                 'should_pay_get_out_of_jail_fine': deque(maxlen=10000),
-                'should_use_escape_jail_card': deque(maxlen=10000)
+                'should_use_escape_jail_card': deque(maxlen=10000),
+                'get_mortgaging_suggestions': deque(maxlen=10000)
             }
             
             # For tracking decisions during a game
@@ -143,11 +146,12 @@ def modify_dqn_for_compatibility():
                 'get_upgrading_suggestions': None,
                 'get_downgrading_suggestions': None,
                 'should_pay_get_out_of_jail_fine': None,
-                'should_use_escape_jail_card': None
+                'should_use_escape_jail_card': None,
+                'get_mortgaging_suggestions': None
             }
-            
+
             self.game_state = None
-    
+
     # Replace the __init__ method
     DQNAgent.__init__ = new_init
     
@@ -208,7 +212,8 @@ def determine_dqn_configuration(
     upgrade_model_path, 
     downgrade_model_path,
     pay_fine_model_path,
-    escape_jail_card_model_path):
+    escape_jail_card_model_path,
+    get_mortgaging_suggestions_model_path):
     """
     Dynamically determine DQN configuration based on provided model paths.
     
@@ -227,7 +232,8 @@ def determine_dqn_configuration(
         'get_upgrading_suggestions', 
         'get_downgrading_suggestions',
         'should_pay_get_out_of_jail_fine',
-        'should_use_escape_jail_card'
+        'should_use_escape_jail_card',
+        'get_mortgaging_suggestions'
     ]
     
     # Map model paths to methods
@@ -237,6 +243,7 @@ def determine_dqn_configuration(
         'get_downgrading_suggestions': downgrade_model_path,
         'should_pay_get_out_of_jail_fine': pay_fine_model_path,
         'should_use_escape_jail_card': escape_jail_card_model_path,
+        'get_mortgaging_suggestions': get_mortgaging_suggestions_model_path
     }
 
     # Configure DQN methods and defaults based on model availability
@@ -264,6 +271,7 @@ def run_dqn_tournament(
         downgrade_model_path: str,
         pay_fine_model_path: str,
         escape_jail_card_model_path: str,
+        get_mortgaging_suggestions_model_path: str,
         config):
     """
     Run a tournament including the DQN agent against other agent types.
@@ -293,7 +301,8 @@ def run_dqn_tournament(
         upgrade_model_path, 
         downgrade_model_path, 
         pay_fine_model_path, 
-        escape_jail_card_model_path  
+        escape_jail_card_model_path,
+        get_mortgaging_suggestions_model_path
     )
     
     # Check if at least one DQN method is being used
@@ -400,7 +409,8 @@ def run_dqn_tournament(
             'upgrading': upgrade_model_path,
             'downgrading': downgrade_model_path,
             'jail_fine': pay_fine_model_path,
-            'escape_jail_card': escape_jail_card_model_path
+            'escape_jail_card': escape_jail_card_model_path,
+            'get_mortgaging_suggestions': get_mortgaging_suggestions_model_path
         },
         'dqn_configuration': {
             method: 'DQN' if dqn_methods[method] is not None else 'Parent'
@@ -495,6 +505,8 @@ def main():
                        help='Path to saved model for paying get out of jail fine decision (without suffixes). If not provided, uses parent class method.')
     parser.add_argument('--escape-jail-card-model-path', type=str, default=None,
                           help='Path to saved model for using escape jail card decision (without suffixes). If not provided, uses parent class method.')
+    parser.add_argument('--get-mortgaging-suggestions-model-path', type=str, default=None,
+                            help='Path to saved model for getting mortgaging suggestions (without suffixes). If not provided, uses parent class method.')
     
     # Tournament type
     parser.add_argument('--two-player', action='store_true', default=True,
@@ -533,7 +545,8 @@ def main():
         args.upgrade_model_path, 
         args.downgrade_model_path, 
         args.pay_fine_model_path, 
-        args.escape_jail_card_model_path
+        args.escape_jail_card_model_path,
+        args.get_mortgaging_suggestions_model_path
     ]
     if not any(path is not None for path in model_paths):
         print("Error: At least one model path must be provided.")
@@ -576,6 +589,7 @@ def main():
     print(f"  Downgrading model: {args.downgrade_model_path if args.downgrade_model_path else 'Parent class method'}")
     print(f"  Pay fine model: {args.pay_fine_model_path if args.pay_fine_model_path else 'Parent class method'}")
     print(f"  Escape jail card model: {args.escape_jail_card_model_path if args.escape_jail_card_model_path else 'Parent class method'}")
+    print(f"  Get mortgaging suggestions model: {args.get_mortgaging_suggestions_model_path if args.get_mortgaging_suggestions_model_path else 'Parent class method'}")
     
     # Start tournament
     print("\nStarting tournament with DQN agent...")
@@ -586,6 +600,7 @@ def main():
             downgrade_model_path=args.downgrade_model_path,
             pay_fine_model_path=args.pay_fine_model_path,
             escape_jail_card_model_path=args.escape_jail_card_model_path,
+            get_mortgaging_suggestions_model_path=args.get_mortgaging_suggestions_model_path,
             config=config
         )
         

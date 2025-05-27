@@ -65,7 +65,8 @@ class DQNAgent(DefaultStrategicPlayer):
             'get_upgrading_suggestions': 0,
             'get_downgrading_suggestions': 0,
             'should_pay_get_out_of_jail_fine': 0,
-            'should_use_escape_jail_card': 0
+            'should_use_escape_jail_card': 0,
+            'get_mortgaging_suggestions': 0
         }
         
         # Define which methods should use DQN and which ones inherit from parent
@@ -75,7 +76,8 @@ class DQNAgent(DefaultStrategicPlayer):
             'get_upgrading_suggestions': None,
             'get_downgrading_suggestions': None,
             'should_pay_get_out_of_jail_fine': None,
-            'should_use_escape_jail_card': None
+            'should_use_escape_jail_card': None,
+            'get_mortgaging_suggestions': None
         }
         
         # Which method is currently being trained (if any)
@@ -87,7 +89,8 @@ class DQNAgent(DefaultStrategicPlayer):
             'get_upgrading_suggestions': 8,  # [8 color groups]
             'get_downgrading_suggestions': 8,  # [8 color groups]
             'should_pay_get_out_of_jail_fine': 2,  # [don't pay, pay]
-            'should_use_escape_jail_card': 2  # [don't use card, use card]
+            'should_use_escape_jail_card': 2,  # [don't use card, use card]
+            'get_mortgaging_suggestions': 40  # [40 board positions - will filter to 22 mortgageable]
         }
 
         self.can_use_defaults_methods = can_use_defaults_methods or {
@@ -95,7 +98,8 @@ class DQNAgent(DefaultStrategicPlayer):
             'get_upgrading_suggestions': False,
             'get_downgrading_suggestions': False,
             'should_pay_get_out_of_jail_fine': False,
-            'should_use_escape_jail_card': False
+            'should_use_escape_jail_card': False,
+            'get_mortgaging_suggestions': False
         }
         
         # Network dictionaries to hold separate networks for each decision
@@ -112,7 +116,8 @@ class DQNAgent(DefaultStrategicPlayer):
             'get_upgrading_suggestions': deque(maxlen=memory_size),
             'get_downgrading_suggestions': deque(maxlen=memory_size),
             'should_pay_get_out_of_jail_fine': deque(maxlen=memory_size),
-            'should_use_escape_jail_card': deque(maxlen=memory_size)
+            'should_use_escape_jail_card': deque(maxlen=memory_size),
+            'get_mortgaging_suggestions': deque(maxlen=memory_size)
         }
         
         # For tracking decisions during a game
@@ -121,13 +126,14 @@ class DQNAgent(DefaultStrategicPlayer):
             'get_upgrading_suggestions': None,
             'get_downgrading_suggestions': None,
             'should_pay_get_out_of_jail_fine': None,
-            'should_use_escape_jail_card': None
+            'should_use_escape_jail_card': None,
+            'get_mortgaging_suggestions': None
         }
         
         # Game state reference
         self.game_state = None
 
-    
+
     def _init_networks(self):
         """Initialize Q-network and target network for each active decision type."""
         try:
@@ -1307,6 +1313,150 @@ class DQNAgent(DefaultStrategicPlayer):
             
             # Fall back to a simple heuristic
             return random.choice([True, False])
+        
+
+    def get_mortgaging_suggestions(self, game_state: GameState) -> List[Tile]:
+        """
+        Decide which properties to mortgage using the DQN policy.
+        
+        Args:
+            game_state: Current game state
+            
+        Returns:
+            List of Tile objects to mortgage
+        """
+        # Check if we should use DQN for this method
+        method = 'get_mortgaging_suggestions'
+        if method not in self.q_networks:
+            if not self.can_use_defaults_methods[method]:
+                print(f"Using parent class implementation for {method}")
+                print(self.q_networks)
+                print(self.can_use_defaults_methods)
+                exit(-1)
+            # Use parent class implementation
+            return super().get_mortgaging_suggestions(game_state)
+        
+        if super().get_mortgaging_suggestions(game_state) == []:
+            # If parent implementation returns empty, we can't mortgage
+            return []
+        
+        # Update epsilon counter for this method
+        if method not in self.epsilon_counter:
+            self.epsilon_counter[method] = 0
+        self.epsilon_counter[method] += 1
+
+        try:
+            # Encode the state
+            state = self.encode_state(game_state)
+            state_tensor = tf.convert_to_tensor([state], dtype=tf.float32)
+            
+            # Get Q-values for all board positions
+            q_values = self.q_networks[method](state_tensor)[0].numpy()
+            
+            # Get all mortgageable properties (owned by us and not already mortgaged)
+            mortgageable_properties = []
+            for tile in game_state.board.tiles:
+                if (isinstance(tile, (Property, Railway, Utility)) and 
+                    tile in game_state.properties[self] and 
+                    tile not in game_state.mortgaged_properties):
+                    
+                    # Additional validation - check if property can actually be mortgaged
+                    if not GameValidation.validate_mortgage_property(game_state, self, tile):
+                        mortgageable_properties.append(tile)
+            
+            if not mortgageable_properties:
+                # No properties can be mortgaged
+                if self.training and (method == self.active_training_method):
+                    # Store decision for training (no mortgage action)
+                    self.current_decisions[method] = {
+                        'state': state,
+                        'action': -1,  # No action
+                        'game_state': game_state,
+                        'mortgageable_properties': []
+                    }
+                return []
+            
+            # In training mode, use epsilon-greedy policy
+            selected_properties = []
+            if self.training and (method == self.active_training_method):
+                if np.random.random() < self.epsilon:
+                    # Random selection - choose 0-3 random properties to mortgage
+                    num_to_select = np.random.randint(0, min(4, len(mortgageable_properties) + 1))
+                    if num_to_select > 0:
+                        selected_properties = np.random.choice(mortgageable_properties, 
+                                                            size=num_to_select, 
+                                                            replace=False).tolist()
+                    action_indices = [prop.id for prop in selected_properties] if selected_properties else [-1]
+                else:
+                    # Use Q-values to select properties
+                    # Get Q-values for mortgageable properties and select top ones above threshold
+                    property_q_values = []
+                    for prop in mortgageable_properties:
+                        if prop.id < len(q_values):
+                            property_q_values.append((prop, q_values[prop.id]))
+                    
+                    # Sort by Q-value (highest first) and select properties above threshold
+                    property_q_values.sort(key=lambda x: x[1], reverse=True)
+                    threshold = np.mean([pq[1] for pq in property_q_values]) if property_q_values else 0
+                    
+                    for prop, q_val in property_q_values:
+                        if q_val > threshold and len(selected_properties) < 3:  # Limit to 3 properties
+                            selected_properties.append(prop)
+                    
+                    action_indices = [prop.id for prop in selected_properties] if selected_properties else [-1]
+                
+                # Store the current decision for future reward
+                self.current_decisions[method] = {
+                    'state': state,
+                    'action': action_indices[0] if action_indices != [-1] else -1,
+                    'game_state': game_state,
+                    'mortgageable_properties': mortgageable_properties,
+                    'selected_properties': selected_properties
+                }
+                
+                # Decay epsilon
+                if self.epsilon_counter[method] % self.epsilon_update_freq == 0:
+                    self.epsilon = max(self.epsilon_end, self.epsilon * self.epsilon_decay)
+            else:
+                # In evaluation mode, select properties with highest Q-values
+                property_q_values = []
+                for prop in mortgageable_properties:
+                    if prop.id < len(q_values):
+                        property_q_values.append((prop, q_values[prop.id]))
+                
+                # Sort by Q-value (highest first) and select top properties above threshold
+                property_q_values.sort(key=lambda x: x[1], reverse=True)
+                if property_q_values:
+                    threshold = np.mean([pq[1] for pq in property_q_values])
+                    
+                    for prop, q_val in property_q_values:
+                        if q_val > threshold and len(selected_properties) < 3:  # Limit to 3 properties
+                            selected_properties.append(prop)
+            
+            return selected_properties
+        
+        except Exception as e:
+            print(f"Error in get_mortgaging_suggestions: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Fallback with penalty in training mode
+            if self.training and (method == self.active_training_method):
+                try:
+                    state = self.encode_state(game_state)
+                    action = -1  # No mortgage
+                    self.memory[method].append((
+                        state,
+                        action,
+                        -0.5,  # Penalty for error
+                        state,  # Same state as next_state since we don't have a real transition
+                        True  # Treat as a terminal state
+                    ))
+                except:
+                    pass
+            
+            # Fall back to parent implementation
+            return super().get_mortgaging_suggestions(game_state)
 
         
     def update_decision(self, method: str, next_game_state: GameState, done: bool = False):
