@@ -362,8 +362,25 @@ class GameManager:
     def __handle_downgrading_suggestions(self, current_player):
         suggestions = current_player.get_downgrading_suggestions(self.game_state)
         for suggestion in suggestions:
+            def report_event():
+                if self.game_state.houses[suggestion][0] == 4:
+                    self.event_manager.register_event(
+                        EventType.HOTEL_SOLD,
+                        player=current_player,
+                        property_group=suggestion,
+                        description=f"{current_player} sold a hotel from {suggestion}"
+                    )
+                else:
+                    self.event_manager.register_event(
+                        EventType.HOUSE_SOLD,
+                        player=current_player,
+                        property_group=suggestion,
+                        description=f"{current_player} sold a house from {suggestion}"
+                    )
+
             try:
                 self.game_state.downgrade_property_group(current_player, suggestion)
+                report_event()
 
             except Exception as e:
                 ErrorLogger.log_error(e)
@@ -373,14 +390,24 @@ class GameManager:
     def __handle_unmortgaging_suggestions(self, current_player):
         suggestions = current_player.get_unmortgaging_suggestions(self.game_state)
         for suggestion in suggestions:
+            def report_event():
+                self.event_manager.register_event(
+                    EventType.PROPERTY_UNMORTGAGED,
+                    player=current_player,
+                    tile=suggestion,
+                    description=f"{current_player} unmortgaged {suggestion}"
+                )
+
             try:
                 self.game_state.unmortgage_property(current_player, suggestion)
+                report_event()
 
             except NotEnoughBalanceException as e:
                 self.__handle_bankruptcy(current_player, e.price, reason="unmortgaging property")
 
                 # player submitted a bankruptcy request
                 self.game_state.unmortgage_property(current_player, suggestion)
+                report_event()
 
             except Exception as e:
                 # TODO: Handle error
@@ -391,8 +418,17 @@ class GameManager:
     def __handle_mortgaging_suggestions(self, current_player):
         suggestions = current_player.get_mortgaging_suggestions(self.game_state)
         for suggestion in suggestions:
+            def report_event():
+                self.event_manager.register_event(
+                    EventType.PROPERTY_MORTGAGED,
+                    player=current_player,
+                    tile=suggestion,
+                    description=f"{current_player} mortgaged {suggestion}"
+                )
+
             try:
                 self.game_state.mortgage_property(current_player, suggestion)
+                report_event()
             
             except Exception as e:
                 ErrorLogger.log_error(e)
@@ -401,14 +437,33 @@ class GameManager:
     def __handle_upgrading_suggestions(self, current_player):
         suggestions = current_player.get_upgrading_suggestions(self.game_state)
         for suggestion in suggestions:
+
+            def report_event():
+                if self.game_state.hotels[suggestion][0] == 1:
+                    self.event_manager.register_event(
+                        EventType.HOTEL_BUILT,
+                        player=current_player,
+                        property_group=suggestion,
+                        description=f"{current_player} built a hotel on {suggestion}"
+                    )
+                else:
+                    self.event_manager.register_event(
+                        EventType.HOUSE_BUILT,
+                        player=current_player,
+                        property_group=suggestion,
+                        description=f"{current_player} built a house on {suggestion}"
+                    )
+
             try:
                 self.game_state.update_property_group(current_player, suggestion)
+                report_event()
 
             except NotEnoughBalanceException as e:
                 self.__handle_bankruptcy(current_player, e.price, reason="upgrading property")
 
                 # player submitted a bankruptcy request
                 self.game_state.update_property_group(current_player, suggestion)
+                report_event()
                 return
 
             except Exception as e:

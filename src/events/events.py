@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Optional, List, Dict
 from game.player import Player
 from models.tile import Tile
+from models.property_group import PropertyGroup
 
 class EventType(Enum):
     # Movement Events
@@ -75,6 +76,7 @@ class Event:
     type: EventType
     player: Player
     target_player: Optional[Player] = None
+    property_group: Optional[PropertyGroup] = None
     tile: Optional[Tile] = None
     amount: Optional[int] = None
     dice: Optional[tuple[int, int]] = None
@@ -103,10 +105,10 @@ class Event:
             EventType.PROPERTY_MORTGAGED: f"{self.player} mortgaged {self.tile} for ${self.amount}" if self.tile and self.amount else f"{self.player} mortgaged a property",
             EventType.PROPERTY_UNMORTGAGED: f"{self.player} unmortgaged {self.tile} for ${self.amount}" if self.tile and self.amount else f"{self.player} unmortgaged a property",
             
-            EventType.HOUSE_BUILT: f"{self.player} built a house on {self.tile}" if self.tile else f"{self.player} built a house",
-            EventType.HOTEL_BUILT: f"{self.player} built a hotel on {self.tile}" if self.tile else f"{self.player} built a hotel",
-            EventType.HOUSE_SOLD: f"{self.player} sold a house from {self.tile}" if self.tile else f"{self.player} sold a house",
-            EventType.HOTEL_SOLD: f"{self.player} sold a hotel from {self.tile}" if self.tile else f"{self.player} sold a hotel",
+            EventType.HOUSE_BUILT: f"{self.player} built a house on {self.property_group}" if self.property_group else f"{self.player} built a house",
+            EventType.HOTEL_BUILT: f"{self.player} built a hotel on {self.property_group}" if self.property_group else f"{self.player} built a hotel",
+            EventType.HOUSE_SOLD: f"{self.player} sold a house from {self.property_group}" if self.property_group else f"{self.player} sold a house",
+            EventType.HOTEL_SOLD: f"{self.player} sold a hotel from {self.property_group}" if self.property_group else f"{self.player} sold a hotel",
             
             EventType.RENT_PAID: f"{self.player} paid ${self.amount} rent to {self.target_player} for {self.tile}" if all([self.amount, self.target_player, self.tile]) else f"{self.player} paid rent",
             EventType.TAX_PAID: f"{self.player} paid ${self.amount} in taxes" if self.amount else f"{self.player} paid taxes",
