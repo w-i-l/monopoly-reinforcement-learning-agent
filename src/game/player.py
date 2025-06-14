@@ -168,7 +168,7 @@ class Player(ABC):
 
     def should_pay_get_out_of_jail_fine(self, game_state) -> bool:
         """
-        Decide whether to pay $50 fine to get out of jail immediately.
+        Decide whether to pay 50₩ fine to get out of jail immediately.
         
         Called when the player is in jail and has the option to pay the fine
         instead of trying to roll doubles or using a Get Out of Jail Free card.
@@ -180,7 +180,7 @@ class Player(ABC):
         Returns
         -------
         bool
-            True to pay the $50 fine and get out immediately, False to try
+            True to pay the 50₩ fine and get out immediately, False to try
             rolling doubles or use a card if available.
         """
         pass

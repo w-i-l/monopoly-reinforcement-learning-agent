@@ -330,7 +330,7 @@ class GameValidation:
         if not game_state.in_jail[player]:
             return NotInJailException(str(player))
 
-        # Check if player has sufficient balance to pay jail fine ($50)
+        # Check if player has sufficient balance to pay jail fine (50₩)
         if game_state.player_balances[player] < game_state.board.get_jail_fine():
             return NotEnoughBalanceException(game_state.board.get_jail_fine(), game_state.player_balances[player])
         
