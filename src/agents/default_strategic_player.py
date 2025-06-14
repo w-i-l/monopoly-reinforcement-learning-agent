@@ -940,10 +940,151 @@ class DefaultStrategicPlayer(Player):
         else:
             # Board is relatively safe, use card to get out
             return True
-    
+        
+
+    def _calculate_trade_value(self, game_state: GameState, properties: List[Tile], money: int, jail_cards: int) -> float:
+        """
+        Calculate the total strategic value of a trade package.
+        
+        Args:
+            game_state: Current game state
+            properties: List of properties in the trade
+            money: Money amount in the trade
+            jail_cards: Number of jail cards in the trade
+            
+        Returns:
+            Total strategic value
+        """
+        total_value = money  # Start with cash value
+        
+        # Add jail card value (strategic worth)
+        total_value += jail_cards * 75  # Each card worth ~$75 strategically
+        
+        # Calculate property values using existing method
+        property_values = self._calculate_property_values(game_state)
+        
+        for prop in properties:
+            if prop in property_values:
+                base_value = property_values[prop]
+                
+                # Add monopoly completion bonus
+                if isinstance(prop, Property):
+                    group_info = self._property_group_completion[prop.group]
+                    
+                    # If this property would complete our monopoly
+                    if group_info["can_complete"] and group_info["remaining_needed"] == 1:
+                        base_value *= 2.5  # Massive bonus for monopoly completion
+                    
+                    # If this property would break opponent's monopoly
+                    # (We need to check who owns it currently)
+                    elif group_info["self_owned"] == 0:  # We don't own any in this group
+                        # Check if opponent has monopoly
+                        for player in game_state.players:
+                            if player != self:
+                                opponent_group_props = game_state.board.get_properties_by_group(prop.group)
+                                if all(p in game_state.properties[player] for p in opponent_group_props):
+                                    base_value *= 1.8  # High value for breaking monopoly
+                                    break
+                
+                total_value += base_value
+        
+        return total_value
+
+    def _calculate_monopoly_impact(self, game_state: GameState, properties_gained: List[Tile], 
+                                properties_lost: List[Tile]) -> Dict[str, float]:
+        """
+        Calculate the monopoly impact of a potential trade.
+        
+        Args:
+            game_state: Current game state
+            properties_gained: Properties we would gain
+            properties_lost: Properties we would lose
+            
+        Returns:
+            Dictionary with monopoly impact metrics
+        """
+        impact = {
+            'monopolies_completed': 0,
+            'monopolies_broken': 0,
+            'monopoly_progress': 0.0,
+            'strategic_value': 0.0
+        }
+        
+        # Check monopolies we would complete
+        for prop in properties_gained:
+            if isinstance(prop, Property):
+                group_properties = game_state.board.get_properties_by_group(prop.group)
+                current_owned = sum(1 for p in group_properties if p in game_state.properties[self])
+                
+                # If gaining this property completes monopoly
+                if current_owned == len(group_properties) - 1:
+                    impact['monopolies_completed'] += 1
+                    impact['strategic_value'] += 500  # High strategic value
+                else:
+                    # Progress toward monopoly
+                    progress = (current_owned + 1) / len(group_properties)
+                    impact['monopoly_progress'] += progress
+                    impact['strategic_value'] += progress * 200
+        
+        # Check monopolies we would break by losing properties
+        for prop in properties_lost:
+            if isinstance(prop, Property):
+                group_properties = game_state.board.get_properties_by_group(prop.group)
+                current_owned = sum(1 for p in group_properties if p in game_state.properties[self])
+                
+                # If losing this property breaks our monopoly
+                if current_owned == len(group_properties):
+                    impact['monopolies_broken'] += 1
+                    impact['strategic_value'] -= 600  # Severe penalty for breaking monopoly
+        
+        return impact
+
+    def _evaluate_cash_impact(self, game_state: GameState, cash_change: int) -> Dict[str, float]:
+        """
+        Evaluate the impact of cash changes on our position.
+        
+        Args:
+            game_state: Current game state
+            cash_change: Net cash change (positive = gaining, negative = losing)
+            
+        Returns:
+            Dictionary with cash impact metrics
+        """
+        current_cash = game_state.player_balances[self]
+        new_cash = current_cash + cash_change
+        
+        impact = {
+            'liquidity_ratio': new_cash / max(game_state.get_player_net_worth(self), 1),
+            'safety_margin': new_cash - self.strategy_params["min_cash_reserve"],
+            'cash_flexibility': 0.0,
+            'risk_level': 0.0
+        }
+        
+        # Calculate cash flexibility (ability to make future moves)
+        if new_cash > 800:
+            impact['cash_flexibility'] = 1.0  # High flexibility
+        elif new_cash > 500:
+            impact['cash_flexibility'] = 0.7  # Good flexibility
+        elif new_cash > 300:
+            impact['cash_flexibility'] = 0.4  # Limited flexibility
+        else:
+            impact['cash_flexibility'] = 0.1  # Very limited
+        
+        # Calculate risk level
+        if new_cash < 100:
+            impact['risk_level'] = 1.0  # Very high risk
+        elif new_cash < 200:
+            impact['risk_level'] = 0.8  # High risk
+        elif new_cash < 400:
+            impact['risk_level'] = 0.5  # Moderate risk
+        else:
+            impact['risk_level'] = 0.2  # Low risk
+        
+        return impact
+
     def should_accept_trade_offer(self, game_state: GameState, trade_offer: TradeOffer) -> bool:
         """
-        Decide whether to accept a trade offer.
+        Enhanced trade acceptance logic with comprehensive strategic analysis.
         
         Args:
             game_state: Current game state
@@ -955,235 +1096,672 @@ class DefaultStrategicPlayer(Player):
         # Validate trade offer
         if error := GameValidation.validate_trade_offer(game_state, trade_offer):
             return False
-            
-        # Calculate value of what we're receiving
-        value_receiving = 0
         
-        # Value of properties we're receiving
-        property_values = self._calculate_property_values(game_state)
+        # Calculate what we're gaining and losing
+        properties_gained = trade_offer.properties_offered or []
+        properties_lost = trade_offer.properties_requested or []
+        money_gained = trade_offer.money_offered or 0
+        money_lost = trade_offer.money_requested or 0
+        jail_cards_gained = trade_offer.jail_cards_offered or 0
+        jail_cards_lost = trade_offer.jail_cards_requested or 0
         
-        for prop in trade_offer.properties_offered:
-            if prop in property_values:
-                value_receiving += property_values[prop]
-                
-                # Extra value for completing monopolies
-                if isinstance(prop, Property):
-                    group_info = self._property_group_completion[prop.group]
-                    if group_info["self_owned"] == group_info["total"] - 1:
-                        value_receiving += self.strategy_params["trade_monopoly_bonus"]
+        net_cash_change = money_gained - money_lost
+        current_cash = game_state.player_balances[self]
         
-        # Value of money we're receiving
-        value_receiving += trade_offer.money_offered or 0
+        # CRITICAL FILTERS - Auto-reject trades that are obviously bad
         
-        # Value of jail cards we're receiving (approximate)
-        value_receiving += (trade_offer.jail_cards_offered or 0) * 50
+        # 1. Don't accept trades that would leave us with dangerously low cash
+        if current_cash + net_cash_change < self.strategy_params["min_cash_reserve"]:
+            return False
         
-        # Calculate value of what we're giving up
-        value_giving = 0
+        # 2. Don't accept trades where money offered exceeds reasonable property value
+        total_property_value = sum(prop.price for prop in properties_gained)
+        if money_gained > total_property_value * 1.5:  # More than 1.5x property value is suspicious
+            return False
         
-        # Value of properties we're giving up
-        for prop in trade_offer.properties_requested:
-            if prop in property_values:
-                value_giving += property_values[prop]
-                
-                # Extra penalty for breaking monopolies
-                if isinstance(prop, Property):
-                    group_info = self._property_group_completion[prop.group]
-                    if group_info["is_monopoly"]:
-                        value_giving += self.strategy_params["trade_monopoly_bonus"]
+        # 3. Don't accept trades where we pay more than 2x property value
+        if money_lost > sum(prop.price for prop in properties_lost) * 2.0:
+            return False
         
-        # Value of money we're giving up
-        value_giving += trade_offer.money_requested or 0
+        # 4. Don't accept trades that would consume more than 70% of our cash
+        if money_lost > current_cash * 0.7:
+            return False
         
-        # Value of jail cards we're giving up (approximate)
-        value_giving += (trade_offer.jail_cards_requested or 0) * 50
+        # 5. Don't break our own monopolies unless compensation is extraordinary
+        for prop in properties_lost:
+            if isinstance(prop, Property):
+                group_properties = game_state.board.get_properties_by_group(prop.group)
+                if all(p in game_state.properties[self] for p in group_properties):
+                    # We're breaking our monopoly - need 3x property value in compensation
+                    compensation_needed = prop.price * 3
+                    total_compensation = self._calculate_trade_value(game_state, properties_gained, 
+                                                                money_gained, jail_cards_gained)
+                    if total_compensation < compensation_needed:
+                        return False
         
-        # Calculate net value gain
-        net_value = value_receiving - value_giving
+        # COMPREHENSIVE STRATEGIC ANALYSIS
+        
+        # Calculate monopoly impacts
+        monopoly_impact = self._calculate_monopoly_impact(game_state, properties_gained, properties_lost)
+        
+        # Calculate cash impact
+        cash_impact = self._evaluate_cash_impact(game_state, net_cash_change)
+        
+        # Calculate trade values
+        value_gained = self._calculate_trade_value(game_state, properties_gained, money_gained, jail_cards_gained)
+        value_lost = self._calculate_trade_value(game_state, properties_lost, money_lost, jail_cards_lost)
+        
+        # DECISION MATRIX - Weight different factors
+        
+        decision_score = 0.0
+        
+        # 1. Raw value comparison (30% weight)
+        value_ratio = value_gained / max(value_lost, 1)
+        if value_ratio > 1.3:
+            decision_score += 0.3  # Great value
+        elif value_ratio > 1.1:
+            decision_score += 0.15  # Good value
+        elif value_ratio > 0.9:
+            decision_score += 0.0  # Fair value
+        else:
+            decision_score -= 0.2  # Poor value
+        
+        # 2. Monopoly impact (40% weight)
+        if monopoly_impact['monopolies_completed'] > 0:
+            decision_score += 0.4 * monopoly_impact['monopolies_completed']  # Huge bonus
+        
+        if monopoly_impact['monopolies_broken'] > 0:
+            decision_score -= 0.3 * monopoly_impact['monopolies_broken']  # Major penalty
+        
+        decision_score += monopoly_impact['monopoly_progress'] * 0.2  # Progress bonus
+        
+        # 3. Cash management (20% weight)
+        if cash_impact['risk_level'] > 0.7:
+            decision_score -= 0.15  # High cash risk penalty
+        elif cash_impact['risk_level'] < 0.3:
+            decision_score += 0.1  # Low risk bonus
+        
+        if cash_impact['cash_flexibility'] > 0.8:
+            decision_score += 0.1  # High flexibility bonus
+        elif cash_impact['cash_flexibility'] < 0.3:
+            decision_score -= 0.1  # Low flexibility penalty
+        
+        # 4. Strategic position (10% weight)
+        # Consider board danger and opponent analysis
+        board_danger = self._assess_board_danger(game_state)
+        if board_danger > 0.7 and net_cash_change < 0:
+            decision_score -= 0.1  # Don't spend cash when board is dangerous
         
         # Consider trade eagerness parameter
-        eagerness_factor = self.strategy_params["trade_eagerness"]
+        eagerness_adjustment = (self.strategy_params["trade_eagerness"] - 0.5) * 0.1
+        decision_score += eagerness_adjustment
         
-        # More eager traders will accept trades with less net value
-        adjusted_threshold = eagerness_factor * 0.9
+        # FINAL DECISION
+        # Also consider random factor for variety (small influence)
+        randomness = (random.random() - 0.5) * 0.05
+        final_score = decision_score + randomness
         
-        # Decision based on net value
-        return net_value > 0 or (net_value >= -50 and random.random() < adjusted_threshold)
-    
+        return final_score > 0.1  # Require positive score with buffer
+
     def get_trade_offers(self, game_state: GameState) -> List[TradeOffer]:
         """
-        Generate trade offers for other players.
+        Enhanced trade offer generation with sophisticated strategic analysis.
         
         Args:
             game_state: Current game state
             
         Returns:
-            List of trade offers
+            List of strategic trade offers
         """
         trade_offers = []
+        current_cash = game_state.player_balances[self]
+        
+        # Don't make trades if we're in a precarious financial situation
+        if current_cash < self.strategy_params["min_cash_reserve"] * 1.5:
+            return []
+        
         property_values = self._calculate_property_values(game_state)
         
-        # Don't make trades in certain situations
-        cash = game_state.player_balances[self]
-        if cash < self.strategy_params["min_cash_reserve"]:
-            # Too low on cash, focus on other strategies
-            return []
-            
-        # For each opponent
+        # For each opponent, analyze potential trades
         for opponent in game_state.players:
             if opponent == self:
                 continue
-                
-            # Skip if opponent has very low cash
+            
             opponent_cash = game_state.player_balances[opponent]
-            if opponent_cash < 100:  # Arbitrary threshold
+            if opponent_cash < 100:  # Skip broke opponents
                 continue
-                
-            # Find properties that would complete our monopolies
-            wanted_properties = []
-            for group, info in self._property_group_completion.items():
-                if info["can_complete"] and not info["is_monopoly"]:
-                    # Find properties in this group owned by the opponent
-                    group_properties = game_state.board.get_properties_by_group(group)
-                    for prop in group_properties:
-                        if prop in game_state.properties[opponent]:
-                            wanted_properties.append(prop)
             
-            # If no interesting properties, skip
-            if not wanted_properties:
-                continue
-                
-            # Determine what we're willing to offer
-            offered_properties = []
+            # STRATEGY 1: Monopoly Completion Trades
+            monopoly_trades = self._generate_monopoly_completion_trades(
+                game_state, opponent, property_values, opponent_cash
+            )
+            trade_offers.extend(monopoly_trades)
             
-            # Find properties we're willing to trade
-            for prop in game_state.properties[self]:
-                # Skip mortgaged properties
-                if prop in game_state.mortgaged_properties:
-                    continue
-                    
-                # Skip properties with houses/hotels
-                if isinstance(prop, Property) and (
-                    (prop.group in game_state.houses and game_state.houses[prop.group][0] > 0) or 
-                    (prop.group in game_state.hotels and game_state.hotels[prop.group][0] > 0)
-                ):
-                    continue
-                    
-                # Skip properties that would complete monopolies for us
+            # STRATEGY 2: Monopoly Breaking Trades
+            breaking_trades = self._generate_monopoly_breaking_trades(
+                game_state, opponent, property_values, opponent_cash
+            )
+            trade_offers.extend(breaking_trades)
+            
+            # STRATEGY 3: Value Optimization Trades
+            value_trades = self._generate_value_optimization_trades(
+                game_state, opponent, property_values, opponent_cash
+            )
+            trade_offers.extend(value_trades)
+            
+            # STRATEGY 4: Cash Generation Trades
+            if current_cash < 600:  # We need cash
+                cash_trades = self._generate_cash_generation_trades(
+                    game_state, opponent, property_values, opponent_cash
+                )
+                trade_offers.extend(cash_trades)
+        
+        # Sort trades by strategic value and return top ones
+        if trade_offers:
+            scored_trades = []
+            for offer in trade_offers:
+                score = self._score_trade_offer(game_state, offer)
+                scored_trades.append((offer, score))
+            
+            # Sort by score (highest first)
+            scored_trades.sort(key=lambda x: x[1], reverse=True)
+            
+            # Return top 3 trades to avoid overwhelming opponents
+            return [trade for trade, score in scored_trades[:3] if score > 0]
+        
+        return []
+
+    def _generate_monopoly_completion_trades(self, game_state: GameState, opponent, 
+                                        property_values: Dict, opponent_cash: int) -> List[TradeOffer]:
+        """Generate trades focused on completing monopolies."""
+        trades = []
+        
+        for group, info in self._property_group_completion.items():
+            if info["can_complete"] and info["remaining_needed"] == 1:
+                # Find the missing property
+                group_properties = game_state.board.get_properties_by_group(group)
+                missing_properties = [p for p in group_properties 
+                                    if p not in game_state.properties[self]]
+                
+                for missing_prop in missing_properties:
+                    if missing_prop in game_state.properties[opponent]:
+                        # Try to acquire this property
+                        trade = self._create_monopoly_completion_trade(
+                            game_state, opponent, missing_prop, property_values, opponent_cash
+                        )
+                        if trade:
+                            trades.append(trade)
+        
+        return trades
+
+    def _generate_monopoly_breaking_trades(self, game_state: GameState, opponent,
+                                        property_values: Dict, opponent_cash: int) -> List[TradeOffer]:
+        """Generate trades focused on breaking opponent monopolies."""
+        trades = []
+        
+        # Check opponent's monopolies
+        for group in PropertyGroup:
+            group_properties = game_state.board.get_properties_by_group(group)
+            if all(p in game_state.properties[opponent] for p in group_properties):
+                # Opponent has monopoly - try to break it by acquiring one property
+                for prop in group_properties:
+                    if prop.price <= self.strategy_params["min_cash_reserve"] * 2:
+                        # Try to buy this property to break monopoly
+                        trade = self._create_monopoly_breaking_trade(
+                            game_state, opponent, prop, property_values, opponent_cash
+                        )
+                        if trade:
+                            trades.append(trade)
+                            break  # Only need to break one property per monopoly
+        
+        return trades
+
+    def _generate_value_optimization_trades(self, game_state: GameState, opponent,
+                                        property_values: Dict, opponent_cash: int) -> List[TradeOffer]:
+        """Generate trades focused on optimizing property values."""
+        trades = []
+        
+        # Find undervalued properties we can acquire
+        for prop in game_state.properties[opponent]:
+            if isinstance(prop, (Property, Railway, Utility)):
+                # Skip if property is part of opponent's monopoly
                 if isinstance(prop, Property):
-                    group_info = self._property_group_completion[prop.group]
-                    if group_info["can_complete"] and group_info["remaining_needed"] <= 1:
-                        continue
-                        
-                # Validate if property can be in trade offer
-                if not GameValidation.validate_property_in_trade_offer(game_state, prop, self):
-                    offered_properties.append(prop)
-            
-            # For each wanted property, try to make a fair trade
-            for wanted_prop in wanted_properties:
-                # Reset offers for each property
-                trade_properties = []
-                trade_money = 0
+                    group_properties = game_state.board.get_properties_by_group(prop.group)
+                    if all(p in game_state.properties[opponent] for p in group_properties):
+                        continue  # Don't try to break monopolies here (handled separately)
                 
-                # Validate if wanted property can be in trade offer
-                if GameValidation.validate_property_in_trade_offer(game_state, wanted_prop, opponent):
-                    continue
+                our_value = property_values.get(prop, prop.price)
+                fair_price = prop.price * 1.1  # 10% premium for negotiation
                 
-                wanted_value = property_values.get(wanted_prop, wanted_prop.price)
-                
-                # Add monopoly completion bonus
-                if isinstance(wanted_prop, Property):
-                    group_info = self._property_group_completion[wanted_prop.group]
-                    if group_info["self_owned"] == group_info["total"] - 1:
-                        wanted_value += self.strategy_params["trade_monopoly_bonus"]
-                
-                # Try to find a property of similar value
-                best_match = None
-                smallest_diff = float('inf')
-                
-                for offer_prop in offered_properties:
-                    offer_value = property_values.get(offer_prop, offer_prop.price)
-                    diff = abs(offer_value - wanted_value)
-                    
-                    if diff < smallest_diff:
-                        smallest_diff = diff
-                        best_match = offer_prop
-                
-                # If we found a reasonable match
-                if best_match and smallest_diff <= wanted_value * 0.3:
-                    trade_properties.append(best_match)
-                    
-                    # Calculate remaining value difference
-                    offer_value = property_values.get(best_match, best_match.price)
-                    diff = wanted_value - offer_value
-                    
-                    # Add money to balance the trade if needed
-                    if diff > 0 and cash >= diff + self.strategy_params["min_cash_reserve"]:
-                        trade_money = min(diff, opponent_cash)
-                        
-                    # Create trade offer
-                    trade_offer = TradeOffer(
-                        source_player=self,
-                        target_player=opponent,
-                        properties_offered=trade_properties,
-                        money_offered=trade_money,
-                        jail_cards_offered=0,
-                        properties_requested=[wanted_prop],
-                        money_requested=0,
-                        jail_cards_requested=0
+                if our_value > fair_price:
+                    # This property is valuable to us
+                    trade = self._create_value_trade(
+                        game_state, opponent, prop, property_values, opponent_cash
                     )
-                    
-                    # Validate trade offer
-                    if not GameValidation.validate_trade_offer(game_state, trade_offer):
-                        trade_offers.append(trade_offer)
+                    if trade:
+                        trades.append(trade)
+        
+        return trades
+
+    def _generate_cash_generation_trades(self, game_state: GameState, opponent,
+                                    property_values: Dict, opponent_cash: int) -> List[TradeOffer]:
+        """Generate trades focused on raising cash."""
+        trades = []
+        
+        # Find properties we can sell for good value
+        for prop in game_state.properties[self]:
+            if isinstance(prop, (Property, Railway, Utility)):
+                # Don't sell monopoly properties
+                if isinstance(prop, Property):
+                    group_properties = game_state.board.get_properties_by_group(prop.group)
+                    if all(p in game_state.properties[self] for p in group_properties):
+                        continue
                 
-                # If we didn't find a property match, try money
-                elif cash >= wanted_value + self.strategy_params["min_cash_reserve"]:
-                    trade_money = min(wanted_value, opponent_cash)
-                    
-                    # Create trade offer
-                    trade_offer = TradeOffer(
+                # Only sell if we can get good value
+                min_price = prop.price * 1.2  # At least 20% premium
+                if opponent_cash >= min_price:
+                    trade = TradeOffer(
                         source_player=self,
                         target_player=opponent,
                         properties_offered=[],
-                        money_offered=trade_money,
+                        money_offered=0,
                         jail_cards_offered=0,
-                        properties_requested=[wanted_prop],
-                        money_requested=0,
+                        properties_requested=[prop],
+                        money_requested=min(min_price, opponent_cash // 2),  # Don't take all their cash
                         jail_cards_requested=0
                     )
                     
-                    # Validate trade offer
-                    if not GameValidation.validate_trade_offer(game_state, trade_offer):
-                        trade_offers.append(trade_offer)
+                    if not GameValidation.validate_trade_offer(game_state, trade):
+                        trades.append(trade)
         
-        # Limit the number of trade offers
-        if trade_offers:
-            # Calculate value gain for each offer
-            offer_values = []
+        return trades
+
+    def _create_monopoly_completion_trade(self, game_state: GameState, opponent,
+                                        target_property: Property, property_values: Dict, 
+                                        opponent_cash: int) -> Optional[TradeOffer]:
+        """Create a trade offer to complete a monopoly."""
+        # Calculate how much we're willing to pay
+        monopoly_value = property_values.get(target_property, target_property.price) * 2.5
+        max_offer = min(monopoly_value, opponent_cash // 2, game_state.player_balances[self] // 3)
+        
+        if max_offer < target_property.price:
+            return None
+        
+        # Try different trade combinations
+        
+        # Option 1: Cash only
+        cash_offer = min(target_property.price * 1.3, max_offer)
+        if cash_offer <= opponent_cash // 3:  # Don't take too much of their cash
+            trade = TradeOffer(
+                source_player=self,
+                target_player=opponent,
+                properties_offered=[],
+                money_offered=0,
+                jail_cards_offered=0,
+                properties_requested=[target_property],
+                money_requested=int(cash_offer),
+                jail_cards_requested=0
+            )
             
-            for offer in trade_offers:
-                value_gaining = sum(property_values.get(prop, prop.price) for prop in offer.properties_requested)
-                value_giving = sum(property_values.get(prop, prop.price) for prop in offer.properties_offered) + offer.money_offered
+            if not GameValidation.validate_trade_offer(game_state, trade):
+                return trade
+        
+        # Option 2: Property + Cash
+        suitable_properties = self._find_suitable_trade_properties(game_state, opponent, target_property)
+        if suitable_properties:
+            offered_property = suitable_properties[0]
+            cash_difference = max(0, target_property.price - offered_property.price)
+            
+            if cash_difference <= max_offer:
+                trade = TradeOffer(
+                    source_player=self,
+                    target_player=opponent,
+                    properties_offered=[offered_property],
+                    money_offered=int(cash_difference),
+                    jail_cards_offered=0,
+                    properties_requested=[target_property],
+                    money_requested=0,
+                    jail_cards_requested=0
+                )
                 
-                # Calculate monopoly completion bonuses
-                for prop in offer.properties_requested:
-                    if isinstance(prop, Property):
-                        group_info = self._property_group_completion[prop.group]
-                        if group_info["self_owned"] == group_info["total"] - 1:
-                            value_gaining += self.strategy_params["trade_monopoly_bonus"]
+                if not GameValidation.validate_trade_offer(game_state, trade):
+                    return trade
+        
+        return None
+
+    def _create_monopoly_breaking_trade(self, game_state: GameState, opponent,
+                                    target_property: Property, property_values: Dict,
+                                    opponent_cash: int) -> Optional[TradeOffer]:
+        """Create a trade offer to break opponent's monopoly."""
+        # Calculate premium for breaking monopoly
+        break_value = target_property.price * 2.0  # High premium
+        max_offer = min(break_value, game_state.player_balances[self] // 4)
+        
+        if max_offer < target_property.price * 1.5:
+            return None
+        
+        trade = TradeOffer(
+            source_player=self,
+            target_player=opponent,
+            properties_offered=[],
+            money_offered=0,
+            jail_cards_offered=0,
+            properties_requested=[target_property],
+            money_requested=int(max_offer),
+            jail_cards_requested=0
+        )
+        
+        if not GameValidation.validate_trade_offer(game_state, trade):
+            return trade
+        
+        return None
+
+    def _create_value_trade(self, game_state: GameState, opponent, target_property,
+                        property_values: Dict, opponent_cash: int) -> Optional[TradeOffer]:
+        """Create a value-based trade offer."""
+        our_value = property_values.get(target_property, target_property.price)
+        fair_offer = min(our_value, target_property.price * 1.2)
+        
+        if fair_offer > game_state.player_balances[self] // 4:
+            return None
+        
+        trade = TradeOffer(
+            source_player=self,
+            target_player=opponent,
+            properties_offered=[],
+            money_offered=0,
+            jail_cards_offered=0,
+            properties_requested=[target_property],
+            money_requested=int(fair_offer),
+            jail_cards_requested=0
+        )
+        
+        if not GameValidation.validate_trade_offer(game_state, trade):
+            return trade
+        
+        return None
+
+    def _find_suitable_trade_properties(self, game_state: GameState, opponent, 
+                                    target_property) -> List[Property]:
+        """Find properties suitable for trading."""
+        suitable = []
+        
+        for prop in game_state.properties[self]:
+            if isinstance(prop, type(target_property)):
+                # Don't trade monopoly properties
+                if isinstance(prop, Property):
+                    group_properties = game_state.board.get_properties_by_group(prop.group)
+                    if all(p in game_state.properties[self] for p in group_properties):
+                        continue
                 
-                net_value = value_gaining - value_giving
-                offer_values.append((offer, net_value))
+                # Property should be of similar or lesser value
+                if prop.price <= target_property.price * 1.2:
+                    suitable.append(prop)
+        
+        # Sort by strategic value (lower first - we prefer to trade less valuable properties)
+        suitable.sort(key=lambda p: p.price)
+        return suitable
+
+    def _score_trade_offer(self, game_state: GameState, trade_offer: TradeOffer) -> float:
+        """Score a trade offer for prioritization."""
+        # This is a simplified scoring - could be expanded
+        properties_gained = trade_offer.properties_offered
+        properties_lost = trade_offer.properties_requested
+        net_cash = trade_offer.money_offered - trade_offer.money_requested
+        
+        monopoly_impact = self._calculate_monopoly_impact(game_state, properties_gained, properties_lost)
+        
+        score = 0.0
+        score += monopoly_impact['monopolies_completed'] * 100
+        score -= monopoly_impact['monopolies_broken'] * 80
+        score += monopoly_impact['strategic_value'] / 10
+        score += net_cash / 50
+        
+        return score
+    
+    # def should_accept_trade_offer(self, game_state: GameState, trade_offer: TradeOffer) -> bool:
+    #     """
+    #     Decide whether to accept a trade offer.
+        
+    #     Args:
+    #         game_state: Current game state
+    #         trade_offer: The trade offer to consider
             
-            # Sort by value gain (highest first)
-            offer_values.sort(key=lambda x: x[1], reverse=True)
+    #     Returns:
+    #         True if the agent should accept the trade, False otherwise
+    #     """
+    #     # Validate trade offer
+    #     if error := GameValidation.validate_trade_offer(game_state, trade_offer):
+    #         return False
             
-            # Take top 1-2 offers
-            result = [offer for offer, _ in offer_values[:min(2, len(offer_values))]]
-            return result
+    #     # Calculate value of what we're receiving
+    #     value_receiving = 0
+        
+    #     # Value of properties we're receiving
+    #     property_values = self._calculate_property_values(game_state)
+        
+    #     for prop in trade_offer.properties_offered:
+    #         if prop in property_values:
+    #             value_receiving += property_values[prop]
+                
+    #             # Extra value for completing monopolies
+    #             if isinstance(prop, Property):
+    #                 group_info = self._property_group_completion[prop.group]
+    #                 if group_info["self_owned"] == group_info["total"] - 1:
+    #                     value_receiving += self.strategy_params["trade_monopoly_bonus"]
+        
+    #     # Value of money we're receiving
+    #     value_receiving += trade_offer.money_offered or 0
+        
+    #     # Value of jail cards we're receiving (approximate)
+    #     value_receiving += (trade_offer.jail_cards_offered or 0) * 50
+        
+    #     # Calculate value of what we're giving up
+    #     value_giving = 0
+        
+    #     # Value of properties we're giving up
+    #     for prop in trade_offer.properties_requested:
+    #         if prop in property_values:
+    #             value_giving += property_values[prop]
+                
+    #             # Extra penalty for breaking monopolies
+    #             if isinstance(prop, Property):
+    #                 group_info = self._property_group_completion[prop.group]
+    #                 if group_info["is_monopoly"]:
+    #                     value_giving += self.strategy_params["trade_monopoly_bonus"]
+        
+    #     # Value of money we're giving up
+    #     value_giving += trade_offer.money_requested or 0
+        
+    #     # Value of jail cards we're giving up (approximate)
+    #     value_giving += (trade_offer.jail_cards_requested or 0) * 50
+        
+    #     # Calculate net value gain
+    #     net_value = value_receiving - value_giving
+        
+    #     # Consider trade eagerness parameter
+    #     eagerness_factor = self.strategy_params["trade_eagerness"]
+        
+    #     # More eager traders will accept trades with less net value
+    #     adjusted_threshold = eagerness_factor * 0.9
+        
+    #     # Decision based on net value
+    #     return net_value > 0 or (net_value >= -50 and random.random() < adjusted_threshold)
+    
+    # def get_trade_offers(self, game_state: GameState) -> List[TradeOffer]:
+    #     """
+    #     Generate trade offers for other players.
+        
+    #     Args:
+    #         game_state: Current game state
             
-        return []
+    #     Returns:
+    #         List of trade offers
+    #     """
+    #     trade_offers = []
+    #     property_values = self._calculate_property_values(game_state)
+        
+    #     # Don't make trades in certain situations
+    #     cash = game_state.player_balances[self]
+    #     if cash < self.strategy_params["min_cash_reserve"]:
+    #         # Too low on cash, focus on other strategies
+    #         return []
+            
+    #     # For each opponent
+    #     for opponent in game_state.players:
+    #         if opponent == self:
+    #             continue
+                
+    #         # Skip if opponent has very low cash
+    #         opponent_cash = game_state.player_balances[opponent]
+    #         if opponent_cash < 100:  # Arbitrary threshold
+    #             continue
+                
+    #         # Find properties that would complete our monopolies
+    #         wanted_properties = []
+    #         for group, info in self._property_group_completion.items():
+    #             if info["can_complete"] and not info["is_monopoly"]:
+    #                 # Find properties in this group owned by the opponent
+    #                 group_properties = game_state.board.get_properties_by_group(group)
+    #                 for prop in group_properties:
+    #                     if prop in game_state.properties[opponent]:
+    #                         wanted_properties.append(prop)
+            
+    #         # If no interesting properties, skip
+    #         if not wanted_properties:
+    #             continue
+                
+    #         # Determine what we're willing to offer
+    #         offered_properties = []
+            
+    #         # Find properties we're willing to trade
+    #         for prop in game_state.properties[self]:
+    #             # Skip mortgaged properties
+    #             if prop in game_state.mortgaged_properties:
+    #                 continue
+                    
+    #             # Skip properties with houses/hotels
+    #             if isinstance(prop, Property) and (
+    #                 (prop.group in game_state.houses and game_state.houses[prop.group][0] > 0) or 
+    #                 (prop.group in game_state.hotels and game_state.hotels[prop.group][0] > 0)
+    #             ):
+    #                 continue
+                    
+    #             # Skip properties that would complete monopolies for us
+    #             if isinstance(prop, Property):
+    #                 group_info = self._property_group_completion[prop.group]
+    #                 if group_info["can_complete"] and group_info["remaining_needed"] <= 1:
+    #                     continue
+                        
+    #             # Validate if property can be in trade offer
+    #             if not GameValidation.validate_property_in_trade_offer(game_state, prop, self):
+    #                 offered_properties.append(prop)
+            
+    #         # For each wanted property, try to make a fair trade
+    #         for wanted_prop in wanted_properties:
+    #             # Reset offers for each property
+    #             trade_properties = []
+    #             trade_money = 0
+                
+    #             # Validate if wanted property can be in trade offer
+    #             if GameValidation.validate_property_in_trade_offer(game_state, wanted_prop, opponent):
+    #                 continue
+                
+    #             wanted_value = property_values.get(wanted_prop, wanted_prop.price)
+                
+    #             # Add monopoly completion bonus
+    #             if isinstance(wanted_prop, Property):
+    #                 group_info = self._property_group_completion[wanted_prop.group]
+    #                 if group_info["self_owned"] == group_info["total"] - 1:
+    #                     wanted_value += self.strategy_params["trade_monopoly_bonus"]
+                
+    #             # Try to find a property of similar value
+    #             best_match = None
+    #             smallest_diff = float('inf')
+                
+    #             for offer_prop in offered_properties:
+    #                 offer_value = property_values.get(offer_prop, offer_prop.price)
+    #                 diff = abs(offer_value - wanted_value)
+                    
+    #                 if diff < smallest_diff:
+    #                     smallest_diff = diff
+    #                     best_match = offer_prop
+                
+    #             # If we found a reasonable match
+    #             if best_match and smallest_diff <= wanted_value * 0.3:
+    #                 trade_properties.append(best_match)
+                    
+    #                 # Calculate remaining value difference
+    #                 offer_value = property_values.get(best_match, best_match.price)
+    #                 diff = wanted_value - offer_value
+                    
+    #                 # Add money to balance the trade if needed
+    #                 if diff > 0 and cash >= diff + self.strategy_params["min_cash_reserve"]:
+    #                     trade_money = min(diff, opponent_cash)
+                        
+    #                 # Create trade offer
+    #                 trade_offer = TradeOffer(
+    #                     source_player=self,
+    #                     target_player=opponent,
+    #                     properties_offered=trade_properties,
+    #                     money_offered=trade_money,
+    #                     jail_cards_offered=0,
+    #                     properties_requested=[wanted_prop],
+    #                     money_requested=0,
+    #                     jail_cards_requested=0
+    #                 )
+                    
+    #                 # Validate trade offer
+    #                 if not GameValidation.validate_trade_offer(game_state, trade_offer):
+    #                     trade_offers.append(trade_offer)
+                
+    #             # If we didn't find a property match, try money
+    #             elif cash >= wanted_value + self.strategy_params["min_cash_reserve"]:
+    #                 trade_money = min(wanted_value, opponent_cash)
+                    
+    #                 # Create trade offer
+    #                 trade_offer = TradeOffer(
+    #                     source_player=self,
+    #                     target_player=opponent,
+    #                     properties_offered=[],
+    #                     money_offered=trade_money,
+    #                     jail_cards_offered=0,
+    #                     properties_requested=[wanted_prop],
+    #                     money_requested=0,
+    #                     jail_cards_requested=0
+    #                 )
+                    
+    #                 # Validate trade offer
+    #                 if not GameValidation.validate_trade_offer(game_state, trade_offer):
+    #                     trade_offers.append(trade_offer)
+        
+    #     # Limit the number of trade offers
+    #     if trade_offers:
+    #         # Calculate value gain for each offer
+    #         offer_values = []
+            
+    #         for offer in trade_offers:
+    #             value_gaining = sum(property_values.get(prop, prop.price) for prop in offer.properties_requested)
+    #             value_giving = sum(property_values.get(prop, prop.price) for prop in offer.properties_offered) + offer.money_offered
+                
+    #             # Calculate monopoly completion bonuses
+    #             for prop in offer.properties_requested:
+    #                 if isinstance(prop, Property):
+    #                     group_info = self._property_group_completion[prop.group]
+    #                     if group_info["self_owned"] == group_info["total"] - 1:
+    #                         value_gaining += self.strategy_params["trade_monopoly_bonus"]
+                
+    #             net_value = value_gaining - value_giving
+    #             offer_values.append((offer, net_value))
+            
+    #         # Sort by value gain (highest first)
+    #         offer_values.sort(key=lambda x: x[1], reverse=True)
+            
+    #         # Take top 1-2 offers
+    #         result = [offer for offer, _ in offer_values[:min(2, len(offer_values))]]
+    #         return result
+            
+    #     return []
     
     def handle_bankruptcy(self, game_state: GameState, amount: int) -> BankruptcyRequest:
         """
