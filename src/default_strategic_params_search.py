@@ -13,15 +13,15 @@ import random
 from typing import Dict, List, Any, Tuple
 
 # Import required agent types and tournament manager
-from agents.default_strategic_player import DefaultStrategicPlayer
-from agents.default_strategic_player import (
+from agents.strategic_agent import StrategicAgent
+from agents.strategic_agent import (
     AggressiveInvestor, CautiousAccumulator, CompletionistBuilder, 
     UtilityKing, OrangeRedSpecialist, LateGameDeveloper, 
-    Trademaster, BalancedPlayer, DynamicAdapter
+    Trademaster, BalancedAgent, DynamicAdapter
 )
 from managers.tournament_manager import TournamentManager
 from agents.random_agent import RandomAgent
-from agents.strategic_agent import StrategicAgent
+from agents.algorithmic_agent import AlgorithmicAgent
 
 # Global configuration variables
 OUTPUT_DIR = "default_strategic_agents_search"
@@ -65,10 +65,10 @@ def run_tournament_vs_default(params_config, games_per_matchup=20, max_turns=300
     try:
         # Create player with specified parameters
         player_name = f"GridSearch_Player_{params_config['id']}"
-        player = DefaultStrategicPlayer(player_name, params_config['params'])
+        player = StrategicAgent(player_name, params_config['params'])
         
         # Create default strategic player as opponent
-        opponent = DefaultStrategicPlayer("Default_Strategic")
+        opponent = StrategicAgent("Strategic")
         
         # Create tournament directory
         config_dir = os.path.join(output_dir, f"config_{params_config['id']}")
@@ -127,7 +127,7 @@ def run_tournament_vs_default(params_config, games_per_matchup=20, max_turns=300
 def create_random_param_configs(num_configs=100):
     """Create random parameter configurations for initial search with all parameters."""
     # Get default parameters as reference
-    default_params = DefaultStrategicPlayer("Default")._get_default_params()
+    default_params = StrategicAgent("Strategic")._get_default_params()
     
     # Define parameter ranges - more extreme to explore wider space
     param_ranges = {
@@ -327,7 +327,7 @@ def phase2_variant_tournament(best_params_from_phase1, num_processes=4):
     for i, row in best_params_from_phase1.iterrows():
         player_name = f"Phase1_Best_{i+1}"
         params = row["params"]
-        player = DefaultStrategicPlayer(player_name, params)
+        player = StrategicAgent(player_name, params)
         best_players.append(player)
         
         # Store mapping for later retrieval
@@ -339,7 +339,7 @@ def phase2_variant_tournament(best_params_from_phase1, num_processes=4):
     
     # Create default variant players
     variant_players = [
-        DefaultStrategicPlayer("DefaultStrategic"),
+        StrategicAgent("Strategic"),
         AggressiveInvestor("Aggressive"),
         CautiousAccumulator("Cautious"),
         CompletionistBuilder("Completionist"),
@@ -347,7 +347,7 @@ def phase2_variant_tournament(best_params_from_phase1, num_processes=4):
         OrangeRedSpecialist("OrangeRed"),
         LateGameDeveloper("LateGame"),
         Trademaster("Trademaster"),
-        BalancedPlayer("Balanced"),
+        BalancedAgent("Balanced"),
         DynamicAdapter("Dynamic")
     ]
     
@@ -422,7 +422,7 @@ def phase3_refinement_tournament(top_configs_from_phase2, num_processes=4):
     for i, row in top_configs_from_phase2.iterrows():
         player_name = f"Top_Config_{i+1}"
         params = row["params"]
-        player = DefaultStrategicPlayer(player_name, params)
+        player = StrategicAgent(player_name, params)
         players.append(player)
         
         # Store mapping
@@ -479,7 +479,7 @@ def phase4_final_tournament(top_configs_from_phase3, num_processes=4):
     for i, row in top_configs_from_phase3.iterrows():
         player_name = f"Optimized_{i+1}"
         params = row["params"]
-        player = DefaultStrategicPlayer(player_name, params)
+        player = StrategicAgent(player_name, params)
         best_players.append(player)
         
         # Save each optimal configuration for reference
@@ -488,7 +488,7 @@ def phase4_final_tournament(top_configs_from_phase3, num_processes=4):
     
     # Create all default variant players
     variant_players = [
-        DefaultStrategicPlayer("DefaultStrategic"),
+        StrategicAgent("Strategic"),
         AggressiveInvestor("Aggressive"),
         CautiousAccumulator("Cautious"),
         CompletionistBuilder("Completionist"),
@@ -496,9 +496,9 @@ def phase4_final_tournament(top_configs_from_phase3, num_processes=4):
         OrangeRedSpecialist("OrangeRed"),
         LateGameDeveloper("LateGame"),
         Trademaster("Trademaster"),
-        BalancedPlayer("Balanced"),
+        BalancedAgent("Balanced"),
         DynamicAdapter("Dynamic"),
-        StrategicAgent("Strategic"),
+        AlgorithmicAgent("Algorithmic"),
         RandomAgent("Random")
     ]
     
@@ -592,7 +592,7 @@ def main():
         # Create main output directory
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         
-        print(f"Starting parameter optimization for DefaultStrategicPlayer")
+        print(f"Starting parameter optimization for StrategicAgent")
         print(f"Results will be saved to {OUTPUT_DIR}")
         print(f"Using {NUM_PROCESSES} worker processes")
         

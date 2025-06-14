@@ -4,8 +4,8 @@ import argparse
 from typing import List, Dict, Any
 
 # Import player types
-from agents.strategic_agent import StrategicAgent
-from agents.default_strategic_player import (
+from src.agents.algorithmic_agent import AlgorithmicAgent
+from src.agents.strategic_agent import (
     AggressiveInvestor,
     CautiousAccumulator,
     CompletionistBuilder,
@@ -13,9 +13,9 @@ from agents.default_strategic_player import (
     OrangeRedSpecialist,
     LateGameDeveloper,
     Trademaster,
-    BalancedPlayer,
+    BalancedAgent,
     DynamicAdapter,
-    DefaultStrategicPlayer
+    StrategicAgent
 )
 from agents.random_agent import RandomAgent
 from managers.tournament_manager import TournamentManager
@@ -35,11 +35,11 @@ def run_player_comparison(args):
         "orange_red": OrangeRedSpecialist,
         "late_game": LateGameDeveloper,
         "trademaster": Trademaster,
-        "balanced": BalancedPlayer,
+        "balanced": BalancedAgent,
         "dynamic": DynamicAdapter,
-        "strategic": StrategicAgent,  # Default strategic with standard params
+        "algorithmic": AlgorithmicAgent,  # Default strategic with standard params
         "random": RandomAgent,
-        "default_strategic": DefaultStrategicPlayer
+        "strategic": StrategicAgent
     }
     
     for i, player_type in enumerate(args.player_types):
@@ -154,7 +154,7 @@ def run_custom_parameter_experiment(args):
     
     # Create players with custom parameters
     for variation in param_variations:
-        players.append(DefaultStrategicPlayer(variation["name"], variation["params"]))
+        players.append(StrategicAgent(variation["name"], variation["params"]))
     
     # Create tournament manager
     tournament_manager = TournamentManager(output_dir=args.output_dir)
@@ -219,7 +219,7 @@ def run_versus_random_benchmark(args):
         CautiousAccumulator("Cautious_Player"),
         CompletionistBuilder("Completionist_Player"),
         UtilityKing("Utility_Player"),
-        BalancedPlayer("Balanced_Player")
+        BalancedAgent("Balanced_Player")
     ]
     
     # Create random agents
@@ -316,10 +316,10 @@ def compare_all_players(args):
         OrangeRedSpecialist("OrangeRed_Player"),
         LateGameDeveloper("LateGame_Player"),
         Trademaster("Trademaster_Player"),
-        BalancedPlayer("Balanced_Player"),
+        BalancedAgent("Balanced_Player"),
         DynamicAdapter("Dynamic_Player"),
-        StrategicAgent("Strategic_Player"),
-        DefaultStrategicPlayer("DefaultStrategic_Player"),
+        AlgorithmicAgent("Algorithmic_Player"),
+        StrategicAgent("DefaultStrategic_Player"),
         RandomAgent("Random_Player")
     ]
     
@@ -393,7 +393,7 @@ if __name__ == "__main__":
     player_comparison_parser.add_argument("--player-types", nargs="+", required=True,
                                          choices=["aggressive", "cautious", "completionist", "utility", 
                                                   "orange_red", "late_game", "trademaster", "balanced", 
-                                                  "dynamic", "strategic", "random", "default_strategic"],
+                                                  "dynamic", "algorithmic", "random", "strategic"],
                                          help="Types of players to include in the tournament")
     
     # Custom parameter experiment

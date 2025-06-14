@@ -7,11 +7,11 @@ import random
 from collections import deque
 
 # Import your existing code
-from agents.expert_dqn_agent import DQNAgent
+from agents.dqn_agent import DQNAgent
 from agents.random_agent import RandomAgent
-from agents.strategic_agent import StrategicAgent
-from agents.default_strategic_player import (
-    DefaultStrategicPlayer,
+from agents.algorithmic_agent import AlgorithmicAgent
+from agents.strategic_agent import (
+    StrategicAgent,
     AggressiveInvestor,
     CautiousAccumulator,
     CompletionistBuilder,
@@ -19,7 +19,7 @@ from agents.default_strategic_player import (
     OrangeRedSpecialist,
     LateGameDeveloper,
     Trademaster,
-    BalancedPlayer,
+    BalancedAgent,
     DynamicAdapter
 )
 from managers.tournament_manager import TournamentManager
@@ -68,8 +68,8 @@ def modify_dqn_for_compatibility():
             print(f"DQN Agent '{name}' initialized (networks will be reused)")
         else:
             # Skip redundant initialization
-            # Call DefaultStrategicPlayer's __init__ directly
-            DefaultStrategicPlayer.__init__(self, name, kwargs.get('strategy_params'))
+            # Call StrategicAgent's __init__ directly
+            StrategicAgent.__init__(self, name, kwargs.get('strategy_params'))
             
             # Copy parameters from class attributes
             self.state_dim = getattr(DQNAgent, '_state_dim', 100)
@@ -351,8 +351,8 @@ def run_dqn_tournament(
     players = [
         tournament_dqn_agent,
         RandomAgent("Random_Player"),
-        StrategicAgent("Algorithmic_Player"),
-        DefaultStrategicPlayer("Strategic_Player"),
+        AlgorithmicAgent("Algorithmic_Player"),
+        StrategicAgent("Strategic_Player"),
         AggressiveInvestor("Aggressive_Player"),
         CautiousAccumulator("Cautious_Player"),
         CompletionistBuilder("Completionist_Player"),
@@ -360,7 +360,7 @@ def run_dqn_tournament(
         OrangeRedSpecialist("OrangeRed_Player"),
         LateGameDeveloper("LateGame_Player"),
         Trademaster("Trademaster_Player"),
-        BalancedPlayer("Balanced_Player"),
+        BalancedAgent("Balanced_Player"),
         DynamicAdapter("Dynamic_Player")
     ]
     

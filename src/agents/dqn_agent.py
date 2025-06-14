@@ -5,7 +5,7 @@ from collections import deque
 import random
 from typing import Dict, List, Tuple, Any, Optional
 
-from agents.default_strategic_player import DefaultStrategicPlayer
+from agents.strategic_agent import StrategicAgent
 from game.game_state import GameState
 from models.tile import Tile
 from game.game_validation import GameValidation
@@ -16,7 +16,7 @@ from models.property_group import PropertyGroup
 
 import traceback
 
-class DQNAgent(DefaultStrategicPlayer):
+class DQNAgent(StrategicAgent):
     """
     DQN (Deep Q-Network) agent for Monopoly that inherits from DefaultStrategicPlayer.
     

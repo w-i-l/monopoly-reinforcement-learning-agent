@@ -8,11 +8,11 @@ import tensorflow as tf
 import numpy as np
 
 # Import your existing code
-from agents.expert_dqn_agent import DQNAgent
+from agents.dqn_agent import DQNAgent
+from agents.algorithmic_agent import AlgorithmicAgent
 from agents.random_agent import RandomAgent
-from agents.strategic_agent import StrategicAgent
-from agents.default_strategic_player import (
-    DefaultStrategicPlayer,
+from agents.strategic_agent import (
+    StrategicAgent,
     AggressiveInvestor,
     CautiousAccumulator,
     CompletionistBuilder,
@@ -20,7 +20,7 @@ from agents.default_strategic_player import (
     OrangeRedSpecialist,
     LateGameDeveloper,
     Trademaster,
-    BalancedPlayer,
+    BalancedAgent,
     DynamicAdapter
 )
 from managers.tournament_manager import TournamentManager
@@ -38,7 +38,7 @@ def set_global_seeds(seed):
 set_global_seeds(321312) # Or any fixed integer
 
 # Add ControllDQNAgent for comparison
-class ControllDQNAgent(DefaultStrategicPlayer):
+class ControllDQNAgent(StrategicAgent):
     '''
     DQN comparing agent for tournament, having all methods of DQNAgent
     but one is set to random for the sake of comparison.
@@ -92,7 +92,7 @@ def modify_dqn_for_compatibility():
         else:
             # Skip redundant initialization
             # Call DefaultStrategicPlayer's __init__ directly
-            DefaultStrategicPlayer.__init__(self, name, kwargs.get('strategy_params'))
+            StrategicAgent.__init__(self, name, kwargs.get('strategy_params'))
             
             # Copy parameters from class attributes
             self.state_dim = getattr(DQNAgent, '_state_dim', 100)
@@ -224,8 +224,8 @@ def run_dqn_tournament(model_path, config):
         dqn_agent,
         controll_dqn_agent,
         RandomAgent("Random_Player"),
+        AlgorithmicAgent("Algorithmic_Player"),
         StrategicAgent("Strategic_Player"),
-        DefaultStrategicPlayer("DefaultStrategic_Player"),
         AggressiveInvestor("Aggressive_Player"),
         CautiousAccumulator("Cautious_Player"),
         CompletionistBuilder("Completionist_Player"),
@@ -233,7 +233,7 @@ def run_dqn_tournament(model_path, config):
         OrangeRedSpecialist("OrangeRed_Player"),
         LateGameDeveloper("LateGame_Player"),
         Trademaster("Trademaster_Player"),
-        BalancedPlayer("Balanced_Player"),
+        BalancedAgent("Balanced_Player"),
         DynamicAdapter("Dynamic_Player")
     ]
     

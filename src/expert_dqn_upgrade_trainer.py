@@ -13,9 +13,9 @@ from math import log, ceil
 
 from managers.game_manager import GameManager
 from agents.random_agent import RandomAgent
-from agents.strategic_agent import StrategicAgent
-from agents.default_strategic_player import DefaultStrategicPlayer, CautiousAccumulator, DynamicAdapter, LateGameDeveloper
-from agents.expert_dqn_agent import DQNAgent  # Your updated DQN agent
+from agents.algorithmic_agent import AlgorithmicAgent
+from agents.strategic_agent import StrategicAgent, CautiousAccumulator, DynamicAdapter, LateGameDeveloper
+from agents.dqn_agent import DQNAgent  # Your updated DQN agent
 from models.property import Property
 from models.railway import Railway
 from models.utility import Utility
@@ -59,9 +59,9 @@ def play_single_game_for_upgrading(agent_types, max_turns=200, dqn_observer=None
                     # Encode current state
                     current_state = dqn_observer.encode_state(game_manager.game_state)
                     
-                    # Get the player's upgrading decision using a temporary DefaultStrategicPlayer
+                    # Get the player's upgrading decision using a temporary StrategicAgent
                     # This way we collect data on how the strategic agent makes decisions
-                    temp_player = DefaultStrategicPlayer(f"Temp_{current_player.name}")
+                    temp_player = StrategicAgent(f"Temp_{current_player.name}")
                     # Copy current player's properties and position to temp player
                     game_manager.game_state.properties[temp_player] = game_manager.game_state.properties[current_player]
                     game_manager.game_state.player_positions[temp_player] = game_manager.game_state.player_positions[current_player]
@@ -173,7 +173,7 @@ def collect_upgrading_experiences(num_games=100, use_multiprocessing=True, num_p
         CautiousAccumulator,
         DynamicAdapter,
         StrategicAgent,
-        DefaultStrategicPlayer
+        StrategicAgent
     ]
     
     # Create DQN observer to encode states
@@ -412,7 +412,7 @@ def play_evaluation_games(dqn_agent, num_games=50, max_turns=200):
     
     # Opponents to test against
     opponents = [
-        DefaultStrategicPlayer("Default"),
+        StrategicAgent("Strategic"),
         LateGameDeveloper("LateGame"),
         CautiousAccumulator("Cautious")
     ]
@@ -548,7 +548,7 @@ def train_dqn_upgrading_through_gameplay(
     
     # Opponents
     opponents = [
-        DefaultStrategicPlayer,
+        StrategicAgent,
         LateGameDeveloper,
         CautiousAccumulator
     ]
