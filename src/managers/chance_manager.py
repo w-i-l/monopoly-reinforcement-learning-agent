@@ -144,7 +144,7 @@ class ChanceManager:
                     tile=nearest_utility,
                     amount=utility_rent,
                     dice=dice_roll,
-                    description=f"{player} paid ${utility_rent} rent to {owner} for {nearest_utility}"
+                    description=f"{player} paid {utility_rent}₩ rent to {owner} for {nearest_utility}"
                 )
                 
             game_state.pay_rent(
@@ -162,7 +162,7 @@ class ChanceManager:
                         player=player,
                         tile=nearest_utility,
                         amount=nearest_utility.price,
-                        description=f"{player} purchased {nearest_utility} for ${nearest_utility.price}"
+                        description=f"{player} purchased {nearest_utility} for {nearest_utility.price}₩"
                     )
                 game_state.buy_property(player, nearest_utility)
 
@@ -174,7 +174,7 @@ class ChanceManager:
                 EventType.TAX_PAID,
                 player=player,
                 amount=tax,
-                description=f"{player} paid ${tax} in taxes"
+                description=f"{player} paid {tax}₩ in taxes"
             )
         game_state.pay_tax(player, tax)
 
@@ -205,7 +205,7 @@ class ChanceManager:
                 EventType.TAX_PAID,
                 player=player,
                 amount=tax,
-                description=f"{player} paid ${tax} for building repairs (houses: {houses_count}, hotels: {hotels_count})"
+                description=f"{player} paid {tax}₩ for building repairs (houses: {houses_count}, hotels: {hotels_count})"
             )
             
         game_state.pay_tax(player, tax)
@@ -223,12 +223,12 @@ class ChanceManager:
                 description=f"{player} moved to Start"
             )
             
-            # Register collection of $200 event
+            # Register collection of 200₩ event
             self.event_manager.register_event(
                 EventType.MONEY_RECEIVED,
                 player=player,
                 amount=200,
-                description=f"{player} collected $200 for reaching Start"
+                description=f"{player} collected 200₩ for reaching Start"
             )
             
         game_state.move_player_to_start(player)
@@ -241,7 +241,7 @@ class ChanceManager:
                 EventType.MONEY_RECEIVED,
                 player=player,
                 amount=amount,
-                description=f"{player} received ${amount} from chance card"
+                description=f"{player} received {amount}₩ from chance card"
             )
         game_state.receive_income(player, amount)
 
@@ -299,7 +299,7 @@ class ChanceManager:
                     target_player=owner,
                     tile=nearest_railway,
                     amount=rent,
-                    description=f"{player} paid ${rent} rent to {owner} for {nearest_railway}"
+                    description=f"{player} paid {rent}₩ rent to {owner} for {nearest_railway}"
                 )
                 
             game_state.pay_rent(player, nearest_railway, railway_factor_multiplier)
@@ -313,7 +313,7 @@ class ChanceManager:
                         player=player,
                         tile=nearest_railway,
                         amount=nearest_railway.price,
-                        description=f"{player} purchased {nearest_railway} for ${nearest_railway.price}"
+                        description=f"{player} purchased {nearest_railway} for {nearest_railway.price}₩"
                     )
                 game_state.buy_property(player, nearest_railway)
 
@@ -376,7 +376,7 @@ class ChanceManager:
                     target_player=owner,
                     tile=current_tile,
                     amount=rent,
-                    description=f"{player} paid ${rent} rent to {owner} for {current_tile}"
+                    description=f"{player} paid {rent}₩ rent to {owner} for {current_tile}"
                 )
                 
             game_state.pay_rent(player, current_tile)
@@ -390,7 +390,7 @@ class ChanceManager:
                         player=player,
                         tile=current_tile,
                         amount=current_tile.price,
-                        description=f"{player} purchased {current_tile} for ${current_tile.price}"
+                        description=f"{player} purchased {current_tile} for {current_tile.price}₩"
                     )
                 game_state.buy_property(player, current_tile)
 
@@ -433,7 +433,7 @@ class ChanceManager:
                     target_player=owner,
                     tile=property_tile,
                     amount=rent,
-                    description=f"{player} paid ${rent} rent to {owner} for {property_tile}"
+                    description=f"{player} paid {rent}₩ rent to {owner} for {property_tile}"
                 )
             
             game_state.pay_rent(player, property_tile)
@@ -447,7 +447,7 @@ class ChanceManager:
                         player=player,
                         tile=property_tile,
                         amount=property_tile.price,
-                        description=f"{player} purchased {property_tile} for ${property_tile.price}"
+                        description=f"{player} purchased {property_tile} for {property_tile.price}₩"
                     )
                 game_state.buy_property(player, property_tile)
 
@@ -473,7 +473,7 @@ class ChanceManager:
                         player=player,
                         target_player=other_player,
                         amount=amount,
-                        description=f"{player} paid ${amount} to {other_player}"
+                        description=f"{player} paid {amount}₩ to {other_player}"
                     )
                     
                     self.event_manager.register_event(
@@ -481,7 +481,7 @@ class ChanceManager:
                         player=other_player,
                         target_player=player,
                         amount=amount,
-                        description=f"{other_player} received ${amount} from {player}"
+                        description=f"{other_player} received {amount}₩ from {player}"
                     )
         game_state.pay_players(player, amount)
 
@@ -490,7 +490,7 @@ class ChanceManager:
         return [
             (
                 0, 
-                "Ai fost ales presedinte al consiliului de administratie. Plateste fiecarui jucatator 50$",
+                "Ai fost ales presedinte al consiliului de administratie. Plateste fiecarui jucatorul 50₩",
                 self.__pay_players, 
                 (50,)
             ),
@@ -508,49 +508,49 @@ class ChanceManager:
             ),
             (
                 3,
-                "Du-te la inchisoare. Du-te direct la inchisoare. Nu treci pe START. Nu colectezi 200$",
+                "Du-te la inchisoare. Du-te direct la inchisoare. Nu treci pe START. Nu colectezi 200₩",
                 self.__move_player_to_jail,
                 ()
             ),
             (
                 4,
-                "Avanseaza la urmatoarea Gara. Daca proprietatea este nevanduta, poti sa o cumperi de la banca. Daca alt jucator o detine, platesti de doua ori chiria. Daca treci pe START, colectezi 200$",
+                "Avanseaza la urmatoarea Gara. Daca proprietatea este nevanduta, poti sa o cumperi de la banca. Daca alt jucator o detine, platesti de doua ori chiria. Daca treci pe START, colectezi 200₩",
                 self.__move_player_to_nearest_railway,
                 (2,)
             ),
             (
                 5, 
-                "Avanseaza la urmatoarea Gara. Daca proprietatea este nevanduta, poti sa o cumperi de la banca. Daca alt jucator o detine, platesti de doua ori chiria. Daca treci pe START, colectezi 200$",
+                "Avanseaza la urmatoarea Gara. Daca proprietatea este nevanduta, poti sa o cumperi de la banca. Daca alt jucator o detine, platesti de doua ori chiria. Daca treci pe START, colectezi 200₩",
                 self.__move_player_to_nearest_railway,
                 (2,)
             ),
             (
                 6,
-                "Mergi la Gara Progresul. Daca treci pe START, colectezi 200$",
+                "Mergi la Gara Progresul. Daca treci pe START, colectezi 200₩",
                 self.__move_player_to_property,
                 ("Gara Progresul",)
             ),
             (
                 7, 
-                "Avanseaza la START. Colectezi 200$",
+                "Avanseaza la START. Colectezi 200₩",
                 self.__move_player_to_start,
                 ()
             ),
             (
                 8,
-                "Efectueaza reparatii la toate proprietatile tale. Pentru fiecare casa platesti 25$, pentru fiecare hotel platesti 100$",
+                "Efectueaza reparatii la toate proprietatile tale. Pentru fiecare casa platesti 25₩, pentru fiecare hotel platesti 100₩",
                 self.__pay_tax_for_buildings,
                 ()
             ),
             (
                 9,
-                "Avanseaza la cea mai apropiata Utilitate. Daca proprietatea este nevanduta, poti sa o cumperi de la banca. Daca alt jucator o detine, platesti de zece ori valoarea zarurilor. Daca treci pe START, colectezi 200$",
+                "Avanseaza la cea mai apropiata Utilitate. Daca proprietatea este nevanduta, poti sa o cumperi de la banca. Daca alt jucator o detine, platesti de zece ori valoarea zarurilor. Daca treci pe START, colectezi 200₩",
                 self.__move_player_to_nearest_utility,
                 ()
             ),
             (
                 10,
-                "Imprumutul pentru cladirile tale a ajuns la maturenitate. Colecteaza 150$",
+                "Imprumutul pentru cladirile tale a ajuns la maturenitate. Colecteaza 150₩",
                 self.__receive_income,
                 (150,)
             ),
@@ -562,25 +562,25 @@ class ChanceManager:
             ),
             (
                 12,
-                "Avanseaza la Titan. Daca treci pe START, colectezi 200$",
+                "Avanseaza la Titan. Daca treci pe START, colectezi 200₩",
                 self.__move_player_to_property,
                 ("Titan",)
             ),
             (
                 13,
-                "Avanseaza la B-dul Eroilor. Daca treci pe START, colectezi 200$",
+                "Avanseaza la B-dul Eroilor. Daca treci pe START, colectezi 200₩",
                 self.__move_player_to_property,
                 ("B-dul Eroilor",)
             ),
             (
                 14,
-                "Banca iti plateste dividendele. Colecteaza 50$",
+                "Banca iti plateste dividendele. Colecteaza 50₩",
                 self.__receive_income,
                 (50,)
             ),
             (
                 15,
-                "Amenda pentru exces de viteza. Plateste 15$",
+                "Amenda pentru exces de viteza. Plateste 15₩",
                 self.__pay_tax,
                 (15,)
             )

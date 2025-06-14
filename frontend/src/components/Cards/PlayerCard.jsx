@@ -175,7 +175,7 @@ const PlayerCard = ({ player, isCurrentPlayer }) => {
       {/* Player stats */}
       <div className="grid grid-cols-3 gap-2 mb-3">
         <div className="bg-white rounded-lg p-2 text-center border border-gray-200 shadow-sm">
-          <div className="font-bold text-blue-600">${balance}</div>
+          <div className="font-bold text-blue-600">{balance}₩</div>
           <div className="text-xs text-gray-500">Balance</div>
         </div>
         <div className="bg-white rounded-lg p-2 text-center border border-gray-200 shadow-sm">

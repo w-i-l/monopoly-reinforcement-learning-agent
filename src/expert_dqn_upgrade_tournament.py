@@ -351,8 +351,8 @@ def run_dqn_tournament(
     players = [
         tournament_dqn_agent,
         RandomAgent("Random_Player"),
-        StrategicAgent("Strategic_Player"),
-        DefaultStrategicPlayer("DefaultStrategic_Player"),
+        StrategicAgent("Algorithmic_Player"),
+        DefaultStrategicPlayer("Strategic_Player"),
         AggressiveInvestor("Aggressive_Player"),
         CautiousAccumulator("Cautious_Player"),
         CompletionistBuilder("Completionist_Player"),
@@ -484,7 +484,7 @@ def run_dqn_tournament(
         print(f"Win Rate: {dqn_results['dqn_ranking']['win_rate']:.4f}")
         print(f"Draw Rate: {dqn_results['dqn_ranking']['draw_rate']:.4f}")
         print(f"Survival Rate: {dqn_results['dqn_ranking']['survival_rate']:.4f}")
-        print(f"Average Net Worth: ${dqn_results['dqn_ranking']['avg_net_worth']:.2f}")
+        print(f"Average Net Worth: {dqn_results['dqn_ranking']['avg_net_worth']:.2f}₩")
         
         # Print DQN configuration
         print("\nDQN Configuration:")

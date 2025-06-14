@@ -98,7 +98,7 @@ def run_player_comparison(args):
     for i, ranking in enumerate(results["overall_stats"]["player_rankings"]):
         print(f"{i+1}. {ranking['player']} - Win Rate: {ranking['win_rate']:.2%}, " +
               f"Draw Rate: {ranking['draw_rate']:.2%}, " +
-              f"Net Worth: ${int(ranking['avg_net_worth'])}, " +
+              f"Net Worth: {int(ranking['avg_net_worth'])}₩, " +
               f"Survival Rate: {ranking['survival_rate']:.2%}")
     
     print("\nCheck the output directory for detailed results and visualizations.")
@@ -204,7 +204,7 @@ def run_custom_parameter_experiment(args):
     for i, ranking in enumerate(results["overall_stats"]["player_rankings"]):
         print(f"{i+1}. {ranking['player']} - Win Rate: {ranking['win_rate']:.2%}, " +
               f"Draw Rate: {ranking['draw_rate']:.2%}, " +
-              f"Net Worth: ${int(ranking['avg_net_worth'])}, " +
+              f"Net Worth: {int(ranking['avg_net_worth'])}₩, " +
               f"Survival Rate: {ranking['survival_rate']:.2%}")
     
     print("\nCheck the output directory for detailed results and visualizations.")
@@ -282,14 +282,14 @@ def run_versus_random_benchmark(args):
     for i, ranking in enumerate(strategic_rankings):
         print(f"{i+1}. {ranking['player']} - Win Rate: {ranking['win_rate']:.2%}, " +
               f"Draw Rate: {ranking['draw_rate']:.2%}, " +
-              f"Net Worth: ${int(ranking['avg_net_worth'])}, " +
+              f"Net Worth: {int(ranking['avg_net_worth'])}₩, " +
               f"Survival Rate: {ranking['survival_rate']:.2%}")
     
     print("\nRandom Player Rankings:")
     for i, ranking in enumerate(random_rankings):
         print(f"{i+1}. {ranking['player']} - Win Rate: {ranking['win_rate']:.2%}, " +
               f"Draw Rate: {ranking['draw_rate']:.2%}, " +
-              f"Net Worth: ${int(ranking['avg_net_worth'])}, " +
+              f"Net Worth: {int(ranking['avg_net_worth'])}₩, " +
               f"Survival Rate: {ranking['survival_rate']:.2%}")
     
     # Calculate averages for each group
@@ -300,8 +300,8 @@ def run_versus_random_benchmark(args):
     random_net_worth = sum(r["avg_net_worth"] for r in random_rankings) / len(random_rankings)
     
     print("\nGroup Comparison:")
-    print(f"Strategic Players - Avg Win Rate: {strategic_win_rate:.2%}, Avg Net Worth: ${int(strategic_net_worth)}")
-    print(f"Random Players - Avg Win Rate: {random_win_rate:.2%}, Avg Net Worth: ${int(random_net_worth)}")
+    print(f"Strategic Players - Avg Win Rate: {strategic_win_rate:.2%}, Avg Net Worth: {int(strategic_net_worth)}₩")
+    print(f"Random Players - Avg Win Rate: {random_win_rate:.2%}, Avg Net Worth: {int(random_net_worth)}₩")
     
     print("\nCheck the output directory for detailed results and visualizations.")
 
@@ -371,7 +371,7 @@ def compare_all_players(args):
     for i, ranking in enumerate(results["overall_stats"]["player_rankings"]):
         print(f"{i+1}. {ranking['player']} - Win Rate: {ranking['win_rate']:.2%}, " +
               f"Draw Rate: {ranking['draw_rate']:.2%}, " +
-              f"Net Worth: ${int(ranking['avg_net_worth'])}, " +
+              f"Net Worth: {int(ranking['avg_net_worth'])}₩, " +
               f"Survival Rate: {ranking['survival_rate']:.2%}")
     
     print("\nCheck the output directory for detailed results and visualizations.")

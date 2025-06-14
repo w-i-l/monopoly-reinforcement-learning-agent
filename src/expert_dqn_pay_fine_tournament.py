@@ -402,13 +402,13 @@ def run_dqn_tournament(model_paths, config):
         print(f"Win Rate: {dqn_results['dqn_ranking']['win_rate']:.4f}")
         print(f"Draw Rate: {dqn_results['dqn_ranking']['draw_rate']:.4f}")
         print(f"Survival Rate: {dqn_results['dqn_ranking']['survival_rate']:.4f}")
-        print(f"Average Net Worth: ${dqn_results['dqn_ranking']['avg_net_worth']:.2f}")
+        print(f"Average Net Worth: {dqn_results['dqn_ranking']['avg_net_worth']:.2f}₩")
     
     # Print control agent comparisons
     if dqn_results['control_comparisons']:
         print("\nControl Agent Comparisons:")
         for control_type, stats in dqn_results['control_comparisons'].items():
-            print(f"  {control_type.title()} Control: {stats['win_rate']:.4f} win rate, ${stats['avg_net_worth']:.2f} avg net worth")
+            print(f"  {control_type.title()} Control: {stats['win_rate']:.4f} win rate, {stats['avg_net_worth']:.2f}₩ avg net worth")
     
     # Print matchup results if available
     if dqn_results['matchup_results'] and two_player:

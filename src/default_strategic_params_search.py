@@ -557,7 +557,7 @@ def generate_final_report(rankings, top_configs, output_dir):
                 f.write(f"Player: {optimized_rankings.iloc[0]['player']}\n")
                 f.write(f"Win Rate: {optimized_rankings.iloc[0]['win_rate']:.2%}\n")
                 f.write(f"Survival Rate: {optimized_rankings.iloc[0]['survival_rate']:.2%}\n")
-                f.write(f"Average Net Worth: ${optimized_rankings.iloc[0]['avg_net_worth']:.2f}\n\n")
+                f.write(f"Average Net Worth: {optimized_rankings.iloc[0]['avg_net_worth']:.2f}₩\n\n")
                 
                 f.write("Parameter Configuration:\n")
                 for param, value in top_config["params"].items():
@@ -579,7 +579,7 @@ def generate_final_report(rankings, top_configs, output_dir):
                     f.write(f"Default Strategic Rank: {default_rank}\n")
                     f.write(f"Win Rate Improvement: {win_rate_diff:.2%}\n")
                     f.write(f"Survival Rate Improvement: {survival_diff:.2%}\n")
-                    f.write(f"Net Worth Improvement: ${networth_diff:.2f}\n")
+                    f.write(f"Net Worth Improvement: {networth_diff:.2f}₩\n")
                     f.write("\n")
         
         f.write("=== END OF REPORT ===\n")

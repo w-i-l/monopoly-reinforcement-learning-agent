@@ -171,14 +171,14 @@ const BuyPropertyDecision = ({ pendingDecision, handleDecision }) => {
     >
       <div className="text-center mb-4">
         <div className="text-lg font-bold text-gray-800 mb-1">{property}</div>
-        <div className="text-2xl font-bold text-blue-600">${price}</div>
+        <div className="text-2xl font-bold text-blue-600">{price}₩</div>
       </div>
 
       <div className="space-y-2 my-4">
-        <InfoItem label="Your Balance" value={`$${balance}`} />
+        <InfoItem label="Your Balance" value={`${balance}₩`} />
         <InfoItem
           label="Remaining Balance After Purchase"
-          value={`$${balance - price}`}
+          value={`${balance - price}₩`}
         />
       </div>
 
@@ -230,7 +230,7 @@ const UpgradePropertiesDecision = ({
     >
       <InfoItem
         label="Your Balance"
-        value={`$${pendingDecision.data.balance}`}
+        value={`${pendingDecision.data.balance}₩`}
       />
 
       <h4 className="font-medium text-gray-700 mt-4 mb-2">
@@ -271,7 +271,7 @@ const UpgradePropertiesDecision = ({
                       </h4>
                     </div>
                     <div className="text-sm bg-white px-2 py-1 rounded-md border border-gray-200 font-medium text-gray-700">
-                      Cost: ${cost}
+                      Cost: {cost}₩
                     </div>
                   </div>
 
@@ -332,7 +332,7 @@ const MortgagePropertiesDecision = ({
     >
       <InfoItem
         label="Your Balance"
-        value={`$${pendingDecision.data.balance}`}
+        value={`${pendingDecision.data.balance}₩`}
       />
 
       <h4 className="font-medium text-gray-700 my-3">
@@ -395,11 +395,11 @@ const PayJailFineDecision = ({ pendingDecision, handleDecision }) => {
       </div>
 
       <div className="space-y-3 my-4">
-        <InfoItem label="Jail Fine" value={`$${jail_fine}`} />
-        <InfoItem label="Your Balance" value={`$${balance}`} />
+        <InfoItem label="Jail Fine" value={`${jail_fine}₩`} />
+        <InfoItem label="Your Balance" value={`${balance}₩`} />
         <InfoItem
           label="Remaining Balance After Payment"
-          value={`$${balance - jail_fine}`}
+          value={`${balance - jail_fine}₩`}
         />
       </div>
 

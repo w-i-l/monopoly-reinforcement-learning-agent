@@ -59,7 +59,7 @@ class GameState:
         
         # Check if player passed Go
         if self.player_positions[player] >= 40:
-            custom_print(f"{player} passed Go and received $200")
+            custom_print(f"{player} passed Go and received 200₩")
             self.player_balances[player] += 200
 
         # Normalize position
@@ -94,7 +94,7 @@ class GameState:
         # after the chance
         tax_tile = self.board.has_landed_on_tax(self.player_positions[player])
         if tax_tile:
-            custom_print(f"{player} landed on {tax_tile.name} and paid ${tax_tile.tax}")
+            custom_print(f"{player} landed on {tax_tile.name} and paid {tax_tile.tax}₩")
             return
         
         # Landing on Orange Property
@@ -109,7 +109,7 @@ class GameState:
         # verify if the player has passed go
         if property_position < player_position:
             self.player_balances[player] += 200
-            custom_print(f"{player} passed Go and received $200")
+            custom_print(f"{player} passed Go and received 200₩")
 
         self.player_positions[player] = property_position
 
@@ -131,7 +131,7 @@ class GameState:
         self.is_owned.add(property)
         self.player_balances[player] -= property.price
 
-        custom_print(f"{player} bought {property} remaining balance: ${self.player_balances[player]}")
+        custom_print(f"{player} bought {property} remaining balance: {self.player_balances[player]}₩")
         custom_print(self.properties)
 
 
@@ -277,7 +277,7 @@ class GameState:
             self.print_debug_info()
             raise error
         
-        custom_print(f"{player} paid ${self.board.get_jail_fine()} to get out of jail")
+        custom_print(f"{player} paid {self.board.get_jail_fine()}₩ to get out of jail")
         self.player_balances[player] -= self.board.get_jail_fine()
         self.in_jail[player] = False
         self.player_positions[player] = 10
@@ -301,7 +301,7 @@ class GameState:
             raise error
         
         self.player_balances[player] -= tax
-        custom_print(f"{player} paid ${tax} tax")
+        custom_print(f"{player} paid {tax}₩ tax")
 
 
     def pay_players(self, player: Player, amount: int):
@@ -313,7 +313,7 @@ class GameState:
             if other_player != player:
                 self.player_balances[player] -= amount
                 self.player_balances[other_player] += amount
-                custom_print(f"{player} paid {other_player} ${amount}")
+                custom_print(f"{player} paid {other_player} {amount}₩")
 
 
     def pay_rent(
@@ -368,14 +368,14 @@ class GameState:
             
         self.player_balances[player] -= rent
         self.player_balances[owner] += rent
-        custom_print(f"{player} paid ${rent} rent to {owner}")
+        custom_print(f"{player} paid {rent}₩ rent to {owner}")
 
 
     ############## RECEIVING ACTIONS ##############
 
     def receive_income(self, player: Player, amount: int):
         self.player_balances[player] += amount
-        custom_print(f"{player} received ${amount}")
+        custom_print(f"{player} received {amount}₩")
 
     
     def receive_from_players(self, player: Player, amount: int):
@@ -387,7 +387,7 @@ class GameState:
             if other_player != player:
                 self.player_balances[other_player] -= amount
                 self.player_balances[player] += amount
-                custom_print(f"{player} received ${amount} from {other_player}")
+                custom_print(f"{player} received {amount}₩ from {other_player}")
 
 
     ############## TRADE ACTIONS ##############

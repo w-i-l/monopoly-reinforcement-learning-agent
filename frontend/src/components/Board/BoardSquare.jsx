@@ -84,7 +84,7 @@ const BoardSquare = ({
       <span className="text-xxs text-center font-medium">{property.name}</span>
 
       {property.price && (
-        <span className="text-xxs mt-1">${property.price}</span>
+        <span className="text-xxs mt-1">{property.price}₩</span>
       )}
 
       {isOwned && (

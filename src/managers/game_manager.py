@@ -205,7 +205,7 @@ class GameManager:
                     EventType.TAX_PAID,
                     player=current_player,
                     amount=current_tile.tax,
-                    description=f"{current_player} paid ${current_tile.tax} in taxes"
+                    description=f"{current_player} paid {current_tile.tax}₩ in taxes"
                 )
 
                 action_to_perform()
@@ -251,7 +251,7 @@ class GameManager:
                     target_player=owner,
                     tile=current_tile,
                     amount=rent_amount,
-                    description=f"{current_player} paid ${rent_amount} rent to {owner} for {current_tile}"
+                    description=f"{current_player} paid {rent_amount}₩ rent to {owner} for {current_tile}"
                 )
                 
                 action_to_perform()
@@ -284,7 +284,7 @@ class GameManager:
                             player=current_player,
                             tile=current_tile,
                             amount=price,
-                            description=f"{current_player} purchased {current_tile} for ${price}"
+                            description=f"{current_player} purchased {current_tile} for {price}₩"
                         )
                         
                         action_to_perform()
@@ -529,7 +529,7 @@ class GameManager:
             player=current_player,
             amount=amount,
             reason=reason,
-            description=f"{current_player} did not have enough money to pay ${amount} for {reason}"
+            description=f"{current_player} did not have enough money to pay {amount}₩ for {reason}"
         )
 
         bankruptcy_request = current_player.handle_banckruptcy(self.game_state, amount)
@@ -590,13 +590,13 @@ class GameManager:
                 EventType.PLAYER_GOT_OUT_OF_JAIL,
                 player=current_player,
                 amount=self.game_state.board.get_jail_fine(),
-                description=f"{current_player} paid ${self.game_state.board.get_jail_fine()} to get out of jail"
+                description=f"{current_player} paid {self.game_state.board.get_jail_fine()}₩ to get out of jail"
             )
             self.event_manager.register_event(
                 EventType.MONEY_PAID,
                 player=current_player,
                 amount=self.game_state.board.get_jail_fine(),
-                description=f"{current_player} paid ${self.game_state.board.get_jail_fine()} jail fine"
+                description=f"{current_player} paid {self.game_state.board.get_jail_fine()}₩ jail fine"
             )
 
         except NotEnoughBalanceException as e:
@@ -680,13 +680,13 @@ class GameManager:
                     EventType.PLAYER_PASSED_GO,
                     player=current_player,
                     amount=200,
-                    description=f"{current_player} passed GO and collected $200"
+                    description=f"{current_player} passed GO and collected 200₩"
                 )
                 self.event_manager.register_event(
                     EventType.MONEY_RECEIVED,
                     player=current_player,
                     amount=200,
-                    description=f"{current_player} collected $200 for passing GO"
+                    description=f"{current_player} collected 200₩ for passing GO"
                 )
             
             # Register player movement event

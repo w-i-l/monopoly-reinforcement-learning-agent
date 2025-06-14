@@ -1687,7 +1687,7 @@ class TournamentManager:
         bars2 = plt.bar(x + width/2, avg_cash, width, label='Avg. Final Cash', color='#2ecc71')
         
         plt.title("Financial Performance by Player", fontsize=16)
-        plt.ylabel("Average Amount ($)", fontsize=12)
+        plt.ylabel("Average Amount ()", fontsize=12)
         plt.xlabel("Player", fontsize=12)
         plt.xticks(x, player_names, rotation=45, ha="right")
         plt.legend()
@@ -1697,7 +1697,7 @@ class TournamentManager:
             for bar in bars:
                 height = bar.get_height()
                 plt.text(bar.get_x() + bar.get_width()/2., height + 50,
-                        f'${int(height)}',
+                        f'{int(height)}₩',
                         ha='center', va='bottom', fontsize=9)
         
         plt.tight_layout()
@@ -1775,7 +1775,7 @@ class TournamentManager:
              f"{r['draw_rate']:.2%}", 
              f"{r['error_rate']:.2%}",
              f"{r['survival_rate']:.2%}", 
-             f"${int(r['avg_net_worth'])}", 
+             f"{int(r['avg_net_worth'])}₩", 
              f"{r['development_rate']:.2f}"] 
             for r in rankings
         ]
@@ -1997,7 +1997,7 @@ class TournamentManager:
                 if metric == "Win Rate" or metric == "Survival Rate":
                     label = f"{value:.2%}"
                 elif metric == "Net Worth":
-                    label = f"${int(value * max_net_worth)}" if max_net_worth > 0 else "$0"
+                    label = f"{int(value * max_net_worth)}₩" if max_net_worth > 0 else "0₩"
                 else:
                     label = f"{value:.2f}"
                 

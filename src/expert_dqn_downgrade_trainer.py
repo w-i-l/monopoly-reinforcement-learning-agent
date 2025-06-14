@@ -518,7 +518,7 @@ def play_evaluation_games(dqn_agent, num_games=50, max_turns=200):
     print(f"Overall win rate: {overall_win_rate:.2%}")
     for opponent_key, opponent_stats in stats.items():
         win_rate = opponent_stats['wins'] / opponent_stats['games_played'] if opponent_stats['games_played'] > 0 else 0
-        print(f"  vs {opponent_key}: {win_rate:.2%} win rate, ${opponent_stats['avg_net_worth']:.2f} avg net worth")
+        print(f"  vs {opponent_key}: {win_rate:.2%} win rate, {opponent_stats['avg_net_worth']:.2f}₩ avg net worth")
     
     # Set the agent back to training mode
     dqn_agent.training = True

@@ -249,11 +249,11 @@ const TradeForm = ({ tradeData, onRemove, onChange, trade, index }) => {
           {/* Money to offer */}
           <div>
             <label className="block text-sm text-gray-600 font-medium mb-2">
-              Money to offer: (Max: ${tradeData?.my_data.balance || 0})
+              Money to offer: (Max: {tradeData?.my_data.balance || 0}₩)
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <DollarSign size={16} className="text-gray-400" />
+                <div className="text-gray-400">₩</div>
               </div>
               <input
                 type="number"
@@ -352,15 +352,15 @@ const TradeForm = ({ tradeData, onRemove, onChange, trade, index }) => {
               {/* Money to request */}
               <div>
                 <label className="block text-sm text-gray-600 font-medium mb-2">
-                  Money to request: (Max: $
+                  Money to request: (Max:
                   {tradeData?.players.find(
                     (p) => p.name === trade.target_player
                   )?.balance || 0}
-                  )
+                  ₩ )
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <DollarSign size={16} className="text-gray-400" />
+                    <div className="text-gray-400">₩</div>
                   </div>
                   <input
                     type="number"
@@ -453,7 +453,7 @@ const TradeForm = ({ tradeData, onRemove, onChange, trade, index }) => {
                 {(trade.properties_offered || []).map((prop, idx) => (
                   <li key={idx}>{prop}</li>
                 ))}
-                {trade.money_offered > 0 && <li>${trade.money_offered}</li>}
+                {trade.money_offered > 0 && <li>{trade.money_offered}₩</li>}
                 {trade.jail_cards_offered > 0 && (
                   <li>
                     {trade.jail_cards_offered} Get Out of Jail Free card(s)
@@ -472,7 +472,7 @@ const TradeForm = ({ tradeData, onRemove, onChange, trade, index }) => {
                 {(trade.properties_requested || []).map((prop, idx) => (
                   <li key={idx}>{prop}</li>
                 ))}
-                {trade.money_requested > 0 && <li>${trade.money_requested}</li>}
+                {trade.money_requested > 0 && <li>{trade.money_requested}₩</li>}
                 {trade.jail_cards_requested > 0 && (
                   <li>
                     {trade.jail_cards_requested} Get Out of Jail Free card(s)
@@ -641,7 +641,7 @@ export const CreateTradeModal = ({ isOpen, onClose, tradeData, onSubmit }) => {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-between">
+        <div className="px-6 py-0 border-t border-gray-200 flex justify-between" style={{padding: "20px"}}>
           <div className="flex gap-3">
             <GlassButton onClick={handleCancel} variant="secondary">
               Cancel

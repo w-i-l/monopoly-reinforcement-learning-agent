@@ -104,7 +104,7 @@ class CommunityChestManager:
                 EventType.MONEY_RECEIVED,
                 player=player,
                 amount=200,
-                description=f"{player} collected $200 for reaching Start"
+                description=f"{player} collected 200₩ for reaching Start"
             )
             
         game_state.move_player_to_start(player)
@@ -117,7 +117,7 @@ class CommunityChestManager:
                 EventType.MONEY_RECEIVED,
                 player=player,
                 amount=amount,
-                description=f"{player} received ${amount}"
+                description=f"{player} received {amount}₩"
             )
         game_state.receive_income(player, amount)
 
@@ -129,7 +129,7 @@ class CommunityChestManager:
                 EventType.TAX_PAID,
                 player=player,
                 amount=tax,
-                description=f"{player} paid ${tax} in taxes"
+                description=f"{player} paid {tax}₩ in taxes"
             )
         game_state.pay_tax(player, tax)
 
@@ -160,7 +160,7 @@ class CommunityChestManager:
                 EventType.TAX_PAID,
                 player=player,
                 amount=tax,
-                description=f"{player} paid ${tax} for building repairs (houses: {houses_count}, hotels: {hotels_count})"
+                description=f"{player} paid {tax}₩ for building repairs (houses: {houses_count}, hotels: {hotels_count})"
             )
             
         game_state.pay_tax(player, tax)
@@ -198,7 +198,7 @@ class CommunityChestManager:
                         player=other_player,
                         target_player=player,
                         amount=amount,
-                        description=f"{other_player} paid ${amount} to {player}"
+                        description=f"{other_player} paid {amount}₩ to {player}"
                     )
                     
                     self.event_manager.register_event(
@@ -206,7 +206,7 @@ class CommunityChestManager:
                         player=player,
                         target_player=other_player,
                         amount=amount,
-                        description=f"{player} received ${amount} from {other_player}"
+                        description=f"{player} received {amount}₩ from {other_player}"
                     )
         game_state.receive_from_players(player, amount)
 
@@ -215,13 +215,13 @@ class CommunityChestManager:
         return [
             (
                 0, 
-                "Pentru fiecare casa pe care o detii, platesti 40$, pentru fiecare hotel platesti 115$",
+                "Pentru fiecare casa pe care o detii, platesti 40₩, pentru fiecare hotel platesti 115₩",
                 self.__pay_tax_for_buildings,
                 ()
             ),
             (
                 1,
-                "Du-te la inchisoare. Du-te direct la inchisoare. Nu treci pe Start. Nu colectezi 200$",
+                "Du-te la inchisoare. Du-te direct la inchisoare. Nu treci pe Start. Nu colectezi 200₩",
                 self.__move_player_to_jail,
                 ()
             ),
@@ -239,73 +239,73 @@ class CommunityChestManager:
             ),
             (
                 4,
-                "Incaseaza 10$ de la fiecare jucator",
+                "Incaseaza 10₩ de la fiecare jucator",
                 self.__receive_from_players,
                 (10,)
             ),
             (
                 5,
-                "Plateste 100$",
+                "Plateste 100₩",
                 self.__pay_tax,
                 (100,)
             ),
             (
                 6,
-                "Incaseaza 100$",
+                "Incaseaza 100₩",
                 self.__receive_income,
                 (100,)
             ),
             (
                 7,
-                "Plateste 50$",
+                "Plateste 50₩",
                 self.__pay_tax,
                 (50,)
             ),
             (
                 8,
-                "Incaseaza 200$",
+                "Incaseaza 200₩",
                 self.__receive_income,
                 (200,)
             ),
             (
                 9,
-                "Incaseaza 100$",
+                "Incaseaza 100₩",
                 self.__receive_income,
                 (100,)
             ),
             (
                 10,
-                "Plateste 50$",
+                "Plateste 50₩",
                 self.__pay_tax,
                 (50,)
             ),
             (
                 11,
-                "Incaseaza 50$",
+                "Incaseaza 50₩",
                 self.__receive_income,
                 (50,)
             ),
             (
                 12,
-                "Incaseaza 100$",
+                "Incaseaza 100₩",
                 self.__receive_income,
                 (100,)
             ),
             (
                 13,
-                "Incaseaza 20$",
+                "Incaseaza 20₩",
                 self.__receive_income,
                 (20,)
             ),
             (
                 14,
-                "Incaseaza 25$",
+                "Incaseaza 25₩",
                 self.__receive_income,
                 (25,)
             ),
             (
                 15,
-                "Incaseaza 10$",
+                "Incaseaza 10₩",
                 self.__receive_income,
                 (10,)
             )

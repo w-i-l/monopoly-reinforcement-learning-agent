@@ -97,25 +97,25 @@ class Event:
         
         descriptions = {
             EventType.PLAYER_MOVED: f"{self.player} moved to {self.tile}" if self.tile else f"{self.player} moved",
-            EventType.PLAYER_PASSED_GO: f"{self.player} passed GO and collected $200",
+            EventType.PLAYER_PASSED_GO: f"{self.player} passed GO and collected 200₩",
             EventType.PLAYER_WENT_TO_JAIL: f"{self.player} went to jail",
             EventType.PLAYER_GOT_OUT_OF_JAIL: f"{self.player} got out of jail",
             
-            EventType.PROPERTY_PURCHASED: f"{self.player} purchased {self.tile} for ${self.amount}" if self.tile and self.amount else f"{self.player} purchased a property",
-            EventType.PROPERTY_MORTGAGED: f"{self.player} mortgaged {self.tile} for ${self.amount}" if self.tile and self.amount else f"{self.player} mortgaged a property",
-            EventType.PROPERTY_UNMORTGAGED: f"{self.player} unmortgaged {self.tile} for ${self.amount}" if self.tile and self.amount else f"{self.player} unmortgaged a property",
+            EventType.PROPERTY_PURCHASED: f"{self.player} purchased {self.tile} for {self.amount}₩" if self.tile and self.amount else f"{self.player} purchased a property",
+            EventType.PROPERTY_MORTGAGED: f"{self.player} mortgaged {self.tile} for {self.amount}₩" if self.tile and self.amount else f"{self.player} mortgaged a property",
+            EventType.PROPERTY_UNMORTGAGED: f"{self.player} unmortgaged {self.tile} for {self.amount}₩" if self.tile and self.amount else f"{self.player} unmortgaged a property",
             
             EventType.HOUSE_BUILT: f"{self.player} built a house on {self.property_group}" if self.property_group else f"{self.player} built a house",
             EventType.HOTEL_BUILT: f"{self.player} built a hotel on {self.property_group}" if self.property_group else f"{self.player} built a hotel",
             EventType.HOUSE_SOLD: f"{self.player} sold a house from {self.property_group}" if self.property_group else f"{self.player} sold a house",
             EventType.HOTEL_SOLD: f"{self.player} sold a hotel from {self.property_group}" if self.property_group else f"{self.player} sold a hotel",
             
-            EventType.RENT_PAID: f"{self.player} paid ${self.amount} rent to {self.target_player} for {self.tile}" if all([self.amount, self.target_player, self.tile]) else f"{self.player} paid rent",
-            EventType.TAX_PAID: f"{self.player} paid ${self.amount} in taxes" if self.amount else f"{self.player} paid taxes",
-            EventType.MONEY_RECEIVED: f"{self.player} received ${self.amount}" if self.amount else f"{self.player} received money",
-            EventType.MONEY_PAID: f"{self.player} paid ${self.amount}" if self.amount else f"{self.player} paid money",
+            EventType.RENT_PAID: f"{self.player} paid {self.amount}₩ rent to {self.target_player} for {self.tile}" if all([self.amount, self.target_player, self.tile]) else f"{self.player} paid rent",
+            EventType.TAX_PAID: f"{self.player} paid {self.amount}₩ in taxes" if self.amount else f"{self.player} paid taxes",
+            EventType.MONEY_RECEIVED: f"{self.player} received {self.amount}₩" if self.amount else f"{self.player} received money",
+            EventType.MONEY_PAID: f"{self.player} paid {self.amount}₩" if self.amount else f"{self.player} paid money",
             EventType.PLAYER_BANKRUPT: f"{self.player} went bankrupt",
-            EventType.PLAYER_DID_NOT_HAVE_ENOUGH_MONEY: f"{self.player} did not have enough money to pay ${self.amount} for {self.reason}",
+            EventType.PLAYER_DID_NOT_HAVE_ENOUGH_MONEY: f"{self.player} did not have enough money to pay {self.amount}₩ for {self.reason}",
             
             EventType.CHANCE_CARD_DRAWN: f"{self.player} drew a Chance card",
             EventType.COMMUNITY_CHEST_CARD_DRAWN: f"{self.player} drew a Community Chest card",
@@ -136,7 +136,7 @@ class Event:
             EventType.GAME_STARTED: "Game has started",
             EventType.GAME_ENDED: f"Game has ended. Winner: {self.player}" if self.player else "Game has ended",
             EventType.AUCTION_STARTED: f"Auction started for {self.tile}" if self.tile else "Auction started",
-            EventType.AUCTION_ENDED: f"Auction ended. {self.tile} sold to {self.player} for ${self.amount}" if all([self.tile, self.player, self.amount]) else "Auction ended"
+            EventType.AUCTION_ENDED: f"Auction ended. {self.tile} sold to {self.player} for {self.amount}₩" if all([self.tile, self.player, self.amount]) else "Auction ended"
         }
         
         return descriptions.get(self.type, f"Event: {self.type}")

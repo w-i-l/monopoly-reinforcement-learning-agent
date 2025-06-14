@@ -88,7 +88,7 @@ class TradeManager:
                         player=trade_offer.source_player,
                         target_player=trade_offer.target_player,
                         amount=trade_offer.money_offered,
-                        description=f"{trade_offer.source_player} paid ${trade_offer.money_offered} to {trade_offer.target_player}"
+                        description=f"{trade_offer.source_player} paid {trade_offer.money_offered}₩ to {trade_offer.target_player}"
                     )
                     
                 if trade_offer.money_requested:
@@ -97,7 +97,7 @@ class TradeManager:
                         player=trade_offer.target_player,
                         target_player=trade_offer.source_player,
                         amount=trade_offer.money_requested,
-                        description=f"{trade_offer.target_player} paid ${trade_offer.money_requested} to {trade_offer.source_player}"
+                        description=f"{trade_offer.target_player} paid {trade_offer.money_requested}₩ to {trade_offer.source_player}"
                     )
                 
                 # Track completion of trade

@@ -24,7 +24,7 @@ const PlayerCard = ({ player, isCurrentPlayer }) => (
   >
     <h3 className="text-lg font-bold mb-2">{player.name}</h3>
     <div className="flex flex-col gap-2">
-      <p>Balance: ${player.balance}</p>
+      <p>Balance: {player.balance}₩</p>
       <div className="text-sm">
         <p>Properties:</p>
         <ul className="list-disc pl-4">
@@ -385,7 +385,7 @@ const MonopolyBoard = () => {
             Current Turn: {currentPlayer.name}
           </h2>
           <div className="flex flex-col gap-2">
-            <p>Balance: ${currentPlayer.balance}</p>
+            <p>Balance: {currentPlayer.balance}₩</p>
             {lastRoll && (
               <div className="flex items-center gap-2">
                 <DiceIcon value={lastRoll.dice[0]} />

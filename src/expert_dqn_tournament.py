@@ -343,7 +343,7 @@ def run_dqn_tournament(model_path, config):
         print(f"Win Rate: {dqn_results['dqn_ranking']['win_rate']:.4f}")
         print(f"Draw Rate: {dqn_results['dqn_ranking']['draw_rate']:.4f}")
         print(f"Survival Rate: {dqn_results['dqn_ranking']['survival_rate']:.4f}")
-        print(f"Average Net Worth: ${dqn_results['dqn_ranking']['avg_net_worth']:.2f}")
+        print(f"Average Net Worth: {dqn_results['dqn_ranking']['avg_net_worth']:.2f}₩")
     
     # Print matchup results if available
     if dqn_results['matchup_results'] and two_player:

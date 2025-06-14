@@ -369,10 +369,10 @@ const EventFeed = ({ playerPort = 6060 }) => {
                         }`}
                       >
                         {event.description}
-                        {event.amount && !event.description.includes("$") && (
+                        {event.amount && !event.description.includes("₩") && (
                           <span className="font-bold text-gray-900">
                             {" "}
-                            (${event.amount})
+                            ({event.amount}₩)
                           </span>
                         )}
                       </p>
