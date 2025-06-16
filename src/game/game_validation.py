@@ -1,6 +1,5 @@
 from typing import Optional, TYPE_CHECKING
 
-from exceptions.exceptions import GameException
 from exceptions.exceptions import *
 from game.player import Player
 from models.property_group import PropertyGroup
@@ -37,6 +36,10 @@ class GameValidation:
             PropertyAlreadyOwnedException, PropertyMortagedException, 
             NotEnoughBalanceException, or None if valid
         """
+        # Check if property is a valid Tile (Property, Railway, or Utility)
+        if not isinstance(property, (Property, Railway, Utility)):
+            return TileCannotBePurchasedException(str(property))
+
         # Check if property is already owned by any player
         if property in game_state.is_owned:
             return PropertyAlreadyOwnedException(str(property))

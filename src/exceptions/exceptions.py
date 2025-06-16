@@ -3,6 +3,14 @@ class GameException(Exception):
     pass
 
 
+class TileCannotBePurchasedException(GameException):
+    """Raised when attempting to purchase a tile that cannot be bought."""
+    
+    def __init__(self, tile_name: str):
+        self.message = f"Tile {tile_name} cannot be purchased"
+        super().__init__(self.message)
+
+
 class PropertyAlreadyOwnedException(GameException):
     """Raised when attempting to purchase or assign a property that is already owned."""
     
