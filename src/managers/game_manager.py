@@ -361,6 +361,10 @@ class GameManager:
 
     def __handle_downgrading_suggestions(self, current_player):
         suggestions = current_player.get_downgrading_suggestions(self.game_state)
+        
+        if not suggestions:
+            return
+
         for suggestion in suggestions:
             def report_event():
                 if self.game_state.houses[suggestion][0] == 4:
