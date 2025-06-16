@@ -1,17 +1,61 @@
+from typing import List, Dict, Set, Tuple
+
 from game.player import Player
 from game.game_state import GameState
+from game.game_validation import GameValidation
+from game.bankruptcy_request import BankruptcyRequest
 from models.tile import Tile
 from models.property_group import PropertyGroup
 from models.property import Property
 from models.utility import Utility
 from models.railway import Railway
-from typing import List, Dict, Set, Tuple
 from models.trade_offer import TradeOffer
-from game.game_validation import GameValidation
-from game.bankruptcy_request import BankruptcyRequest
+
 
 class AlgorithmicAgent(Player):
-    def __init__(self, name, 
+    """
+    Algorithmic Monopoly agent that makes decisions using configurable rule-based strategies.
+    
+    This agent implements a comprehensive algorithmic approach to Monopoly gameplay,
+    using quantitative analysis and configurable parameters to make strategic decisions.
+    All decisions are subject to game rule validation, with invalid actions being
+    automatically filtered out.
+    
+    The agent evaluates properties based on multiple strategic factors including
+    rent-to-cost ratios, set completion potential, landing probabilities, and
+    development opportunities. Financial management is handled through configurable
+    thresholds for cash reserves, emergency situations, and ROI calculations.
+
+    Attributes
+    ----------
+    min_safe_balance : int
+        Minimum cash to maintain for safety and future opportunities
+    emergency_threshold : int
+        Cash level below which emergency measures (mortgaging, selling) are triggered
+    property_value_threshold : float
+        Multiplier for property purchase decisions (buy if value > price * threshold)
+    hotel_roi_threshold : float
+        Minimum ROI required to upgrade properties to hotels
+    house_roi_threshold : float
+        Minimum ROI required to upgrade properties with houses
+    max_mortgage_at_once : int
+        Maximum number of properties to mortgage in a single turn
+    railway_value_multiplier : float
+        Value multiplier for railways based on quantity owned
+    utility_pair_multiplier : float
+        Value multiplier when owning multiple utilities
+    complete_set_multiplier : float
+        Value multiplier for properties that complete color groups
+    jail_escape_property_threshold : int
+        Minimum number of valuable properties required to justify paying jail fine
+    bankruptcy_liquidity_priority : bool
+        If True, prioritize selling buildings over mortgaging in bankruptcy
+    property_values : Dict[Tile, float]
+        Cache for calculated property strategic values
+    """
+
+
+    def __init__(self, name: str, 
                  min_safe_balance: int = 200,
                  emergency_threshold: int = 100,
                  property_value_threshold: float = 1.1,
@@ -23,6 +67,36 @@ class AlgorithmicAgent(Player):
                  complete_set_multiplier: float = 1.5,
                  jail_escape_property_threshold: int = 2,
                  bankruptcy_liquidity_priority: bool = True):
+        """
+        Initialize the algorithmic agent with configurable strategy parameters.
+        
+        Parameters
+        ----------
+        name : str
+            Display name for this agent
+        min_safe_balance : int, default 200
+            Minimum cash to maintain for safety and opportunities
+        emergency_threshold : int, default 100
+            Cash level that triggers emergency asset liquidation
+        property_value_threshold : float, default 1.1
+            Buy properties only if strategic value exceeds price * threshold
+        hotel_roi_threshold : float, default 0.15
+            Minimum ROI required for hotel upgrades
+        house_roi_threshold : float, default 0.12
+            Minimum ROI required for house upgrades
+        max_mortgage_at_once : int, default 2
+            Maximum properties to mortgage per decision cycle
+        railway_value_multiplier : float, default 1.2
+            Exponential multiplier for railway values based on quantity
+        utility_pair_multiplier : float, default 1.5
+            Value multiplier when second utility is acquired
+        complete_set_multiplier : float, default 1.5
+            Value multiplier for properties completing color groups
+        jail_escape_property_threshold : int, default 2
+            Minimum valuable properties to justify paying jail fine
+        bankruptcy_liquidity_priority : bool, default True
+            Prioritize building sales over property mortgaging in bankruptcy
+        """
         super().__init__(name)
         # Configurable parameters
         self.min_safe_balance = min_safe_balance
@@ -38,9 +112,28 @@ class AlgorithmicAgent(Player):
         self.bankruptcy_liquidity_priority = bankruptcy_liquidity_priority  # If True, prioritize liquid assets in bankruptcy
         
         self.property_values = {}  # Cache for property valuations
-        
+
+
     def calculate_property_value(self, game_state: GameState, property: Tile) -> float:
-        """Calculates strategic value of a property based on multiple factors."""
+        """
+        Calculate the strategic value of a property using multiple valuation factors.
+        
+        Evaluates properties based on rent-to-cost ratios, set completion potential,
+        landing probabilities, and synergies with existing portfolio. Results are
+        cached for performance optimization.
+        
+        Parameters
+        ----------
+        game_state : GameState
+            Current game state
+        property : Tile
+            Property to evaluate
+            
+        Returns
+        -------
+        float
+            Calculated strategic value of the property
+        """
         if property in self.property_values:
             return self.property_values[property]
         
@@ -61,22 +154,24 @@ class AlgorithmicAgent(Player):
             rent_to_cost = property.hotel_rent / property.price if property.price > 0 else 0
             value_multiplier *= (1 + rent_to_cost)
             
-            # Value properties that others land on frequently
+            # Value properties that others land on frequently (based on statistical analysis)
             landing_probability = {
-                6: 1.3,  # 6 spaces from Start
-                16: 1.2, # Common dice roll sums
-                26: 1.2,
-                9: 1.1,
-                4: 1.1,
+                6: 1.3,   
+                16: 1.2,  
+                26: 1.2,  
+                9: 1.1,   
+                4: 1.1,   
                 10: 1.1
             }.get(property.id, 1.0)
             value_multiplier *= landing_probability
 
         elif isinstance(property, Railway):
+            # Railways become exponentially more valuable with quantity
             owned_railways = sum(1 for p in game_state.properties.get(self, []) if isinstance(p, Railway))
             value_multiplier *= (self.railway_value_multiplier ** owned_railways)
 
         elif isinstance(property, Utility):
+            # Utilities gain significant value when paired
             owned_utilities = sum(1 for p in game_state.properties.get(self, []) if isinstance(p, Utility))
             value_multiplier *= (self.utility_pair_multiplier if owned_utilities == 1 else 1.0)
 
@@ -84,8 +179,8 @@ class AlgorithmicAgent(Player):
         self.property_values[property] = calculated_value
         return calculated_value
 
+
     def should_buy_property(self, game_state: GameState, property: Tile) -> bool:
-        """Decide whether to buy a property based on its strategic value."""
         # First validate that we can buy this property
         if error := GameValidation.validate_buy_property(game_state, self, property):
             return False
@@ -96,14 +191,16 @@ class AlgorithmicAgent(Player):
         budget = game_state.player_balances.get(self, 0)
         price = property.price
 
+        # Ensure purchase maintains minimum safe balance
         if budget < price + self.min_safe_balance:
             return False
 
+        # Buy only if strategic value exceeds price threshold
         property_value = self.calculate_property_value(game_state, property)
         return property_value > price * self.property_value_threshold
 
+
     def get_upgrading_suggestions(self, game_state: GameState) -> List[PropertyGroup]:
-        """Suggest property groups to upgrade based on ROI threshold."""
         properties = [p for p in game_state.properties.get(self, []) if isinstance(p, Property)]
         grouped_properties = {p.group: [] for p in properties}
         for prop in properties:
@@ -117,6 +214,7 @@ class AlgorithmicAgent(Player):
             if any(p in game_state.mortgaged_properties for p in props):
                 continue
                 
+            # Must own complete color group to develop
             if len(props) != len(game_state.board.get_properties_by_group(group)):
                 continue
 
@@ -127,6 +225,7 @@ class AlgorithmicAgent(Player):
             current_houses = game_state.houses[group][0]
             current_hotels = game_state.hotels[group][0]
             
+            # Consider hotel upgrade (4 houses -> hotel)
             if current_hotels == 0 and current_houses == 4:
                 cost = group.hotel_cost()
                 if budget >= cost + self.min_safe_balance:
@@ -136,6 +235,8 @@ class AlgorithmicAgent(Player):
                         if not GameValidation.validate_place_hotel(game_state, self, group):
                             suggestions.append(group)
                             budget -= cost
+            
+            # Consider house upgrade (0-3 houses -> +1 house)
             elif current_houses < 4 and current_hotels == 0:
                 cost = group.house_cost() * len(props)
                 if budget >= cost + self.min_safe_balance:
@@ -148,8 +249,28 @@ class AlgorithmicAgent(Player):
 
         return suggestions
 
+
     def _calculate_upgrade_roi(self, game_state: GameState, group: PropertyGroup, is_hotel: bool) -> float:
-        """Calculate return on investment for an upgrade."""
+        """
+        Calculate return on investment for a potential property upgrade.
+        
+        Compares rent increase from upgrade against the cost of development
+        to determine if the investment meets ROI thresholds.
+        
+        Parameters
+        ----------
+        game_state : GameState
+            Current game state
+        group : PropertyGroup
+            Property group to analyze for upgrade
+        is_hotel : bool
+            True for hotel upgrade, False for house upgrade
+            
+        Returns
+        -------
+        float
+            ROI as rent increase per dollar invested
+        """
         properties = game_state.board.get_properties_by_group(group)
         
         # Check if the group exists in houses dictionary
@@ -158,6 +279,7 @@ class AlgorithmicAgent(Player):
             
         current_houses = game_state.houses[group][0]
         
+        # Calculate current total rent for the group
         current_rent = 0
         for p in properties:
             if current_houses > 0:
@@ -168,6 +290,7 @@ class AlgorithmicAgent(Player):
             else:
                 current_rent += p.base_rent
         
+        # Calculate rent after upgrade
         if is_hotel:
             new_rent = sum(p.hotel_rent for p in properties)
             cost = group.hotel_cost()
@@ -183,18 +306,19 @@ class AlgorithmicAgent(Player):
             
         return (new_rent - current_rent) / cost if cost > 0 else 0
 
+
     def get_mortgaging_suggestions(self, game_state: GameState) -> List[Tile]:
-        """Suggest properties to mortgage based on strategic value and emergency threshold."""
         properties = game_state.properties.get(self, [])
         budget = game_state.player_balances.get(self, 0)
         
+        # Only mortgage in emergency situations
         if budget > self.emergency_threshold:
             return []
             
         mortgage_candidates = []
         for prop in properties:
             if isinstance(prop, Property):
-                # Check if the group exists in houses/hotels dictionaries
+                # Don't mortgage properties with buildings
                 if prop.group in game_state.houses and game_state.houses[prop.group][0] > 0:
                     continue
                 if prop.group in game_state.hotels and game_state.hotels[prop.group][0] > 0:
@@ -209,13 +333,15 @@ class AlgorithmicAgent(Player):
                 mortgage_value = prop.mortgage
                 
                 if mortgage_value > 0:  # Avoid division by zero
+                    # Lower ratio = better candidate for mortgaging
                     mortgage_candidates.append((prop, strategic_value / mortgage_value))
                     
+        # Sort by strategic value ratio (lowest first - best to mortgage)
         mortgage_candidates.sort(key=lambda x: x[1])
         return [prop for prop, _ in mortgage_candidates[:self.max_mortgage_at_once]]
 
+
     def get_unmortgaging_suggestions(self, game_state: GameState) -> List[Tile]:
-        """Suggest properties to unmortgage based on strategic value and available budget."""
         properties = game_state.properties.get(self, [])
         budget = game_state.player_balances.get(self, 0)
         mortgaged_properties = [p for p in properties if p in game_state.mortgaged_properties]
@@ -245,17 +371,20 @@ class AlgorithmicAgent(Player):
                                       p not in game_state.mortgaged_properties)
                 total_in_group = len(group_properties)
                 
+                # Boost priority if this completes a monopoly
                 if owned_unmortgaged == total_in_group - 1:
                     priority_score *= 1.5
                     
             if budget >= prop.buyback_price + self.min_safe_balance:
                 unmortgage_candidates.append((prop, priority_score))
         
-        unmortgage_candidates.sort(key=lambda x: x[1], reverse=True)  # Sort by highest priority
+        # Sort by highest priority first
+        unmortgage_candidates.sort(key=lambda x: x[1], reverse=True)
         return [prop for prop, _ in unmortgage_candidates[:self.max_mortgage_at_once]]
 
+
     def get_downgrading_suggestions(self, game_state: GameState) -> List[PropertyGroup]:
-        """Suggest property groups to downgrade based on ROI and emergency threshold."""
+        # Only downgrade in emergency situations
         if game_state.player_balances.get(self, 0) > self.emergency_threshold:
             return []
             
@@ -266,6 +395,7 @@ class AlgorithmicAgent(Player):
             
         suggestions = []
         for group, props in grouped_properties.items():
+            # Must own complete color group to have developments
             if len(props) != len(game_state.board.get_properties_by_group(group)):
                 continue
                 
@@ -273,27 +403,32 @@ class AlgorithmicAgent(Player):
             if group not in game_state.houses or group not in game_state.hotels:
                 continue
                 
+            # Consider selling hotels
             if game_state.hotels[group][0] > 0 and game_state.hotels[group][1] == self:
                 # Validate hotel sale
                 if error := GameValidation.validate_sell_hotel(game_state, self, group):
                     continue
                     
                 roi = self._calculate_upgrade_roi(game_state, group, is_hotel=True)
-                if roi < self.hotel_roi_threshold * 0.7:  # Lower threshold for selling
+                # Use lower threshold for selling (emergency situation)
+                if roi < self.hotel_roi_threshold * 0.7:
                     suggestions.append(group)
+            
+            # Consider selling houses
             elif game_state.houses[group][0] > 0 and game_state.houses[group][1] == self:
                 # Validate house sale
                 if error := GameValidation.validate_sell_house(game_state, self, group):
                     continue
                     
                 roi = self._calculate_upgrade_roi(game_state, group, is_hotel=False)
+                # Use lower threshold for selling (emergency situation)
                 if roi < self.house_roi_threshold * 0.7:
                     suggestions.append(group)
                     
         return suggestions
 
+
     def should_pay_get_out_of_jail_fine(self, game_state: GameState) -> bool:
-        """Decide whether to pay the jail fine based on budget and property portfolio."""
         # First check if player is in jail
         if not game_state.in_jail.get(self, False):
             return False
@@ -301,16 +436,18 @@ class AlgorithmicAgent(Player):
         budget = game_state.player_balances.get(self, 0)
         fine = game_state.board.get_jail_fine()
         
+        # Don't pay if it would compromise financial safety
         if budget < fine * 2:
             return False
             
+        # Pay fine only if we have valuable properties worth actively managing
         valuable_properties = sum(1 for p in game_state.properties.get(self, []) 
                                 if isinstance(p, Property) and 
                                 self.calculate_property_value(game_state, p) > p.price * self.property_value_threshold)
         return valuable_properties > self.jail_escape_property_threshold
 
+
     def should_use_escape_jail_card(self, game_state: GameState) -> bool:
-        """Decide whether to use a Get Out of Jail Free card based on property development."""
         # First check if player is in jail
         if not game_state.in_jail.get(self, False):
             return False
@@ -318,18 +455,20 @@ class AlgorithmicAgent(Player):
         if game_state.escape_jail_cards.get(self, 0) == 0:
             return False
             
+        # Use card if we have developed properties that need active management
         valuable_properties = 0
         for p in game_state.properties.get(self, []):
             if isinstance(p, Property):
                 group = p.group
+                # Count properties with houses or hotels
                 if (group in game_state.houses and game_state.houses[group][0] > 0 and game_state.houses[group][1] == self) or \
                    (group in game_state.hotels and game_state.hotels[group][0] > 0 and game_state.hotels[group][1] == self):
                     valuable_properties += 1
                     
         return valuable_properties > 0
     
+
     def should_accept_trade_offer(self, game_state: GameState, trade_offer: TradeOffer) -> bool:
-        """Evaluate whether to accept an incoming trade offer based on strategic value."""
         # Validate trade offer with GameValidation
         if error := GameValidation.validate_trade_offer(game_state, trade_offer):
             return False
@@ -345,7 +484,7 @@ class AlgorithmicAgent(Player):
         # Calculate total value of what we're giving up
         value_giving = (
             money_requested +
-            (jail_cards_requested * 50) +  # Base value for jail cards
+            (jail_cards_requested * 50) +  # Base strategic value for jail cards
             sum(self.calculate_property_value(game_state, prop)
                 for prop in properties_requested if prop is not None)
         )
@@ -366,6 +505,7 @@ class AlgorithmicAgent(Player):
                 if group_properties:  # Verify group properties exist
                     owned_in_group = sum(1 for p in group_properties 
                                     if p in game_state.properties.get(self, []))
+                    # Massive bonus for completing monopoly
                     if owned_in_group == len(group_properties) - 1:
                         value_receiving *= self.complete_set_multiplier
 
@@ -376,6 +516,7 @@ class AlgorithmicAgent(Player):
                 if group_properties:  # Verify group properties exist
                     owned_in_group = sum(1 for p in group_properties 
                                     if p in game_state.properties.get(self, []))
+                    # Penalty for breaking monopoly
                     if owned_in_group == len(group_properties):
                         value_giving *= self.complete_set_multiplier
 
@@ -387,14 +528,15 @@ class AlgorithmicAgent(Player):
         if trade_offer.source_player in game_state.properties:
             opponent_properties = len(game_state.properties[trade_offer.source_player])
             our_properties = len(game_state.properties.get(self, []))
-            if opponent_properties > our_properties * 1.5:  # If they're significantly ahead
-                value_receiving *= 1.2  # We're more willing to take risks
+            # If opponent is significantly ahead, be more willing to take risks
+            if opponent_properties > our_properties * 1.5:
+                value_receiving *= 1.2
 
-        # Final decision with a small margin for positive trades
+        # Final decision with margin for positive trades
         return value_receiving > value_giving * 1.1  # 10% margin required for acceptance
 
+
     def get_trade_offers(self, game_state: GameState) -> List[TradeOffer]:
-        """Generate strategic trade offers for other players."""
         trade_offers = []
         
         # Validate game state and players
@@ -425,7 +567,8 @@ class AlgorithmicAgent(Player):
                         
                     our_count = sum(1 for p in group_properties 
                                 if p in game_state.properties.get(self, []))
-                    if our_count > 0:  # We already have some properties in this group
+                    # Target properties in groups where we already have a presence
+                    if our_count > 0:
                         # Validate if property can be in trade offer
                         if not GameValidation.validate_property_in_trade_offer(game_state, prop, target_player):
                             desired_properties.append(prop)
@@ -447,8 +590,10 @@ class AlgorithmicAgent(Player):
                         
                     our_count = sum(1 for p in group_properties 
                                 if p in game_state.properties.get(self, []))
+                    # Only offer properties from incomplete sets
                     if our_count != len(group_properties):
                         strategic_value = self.calculate_property_value(game_state, prop)
+                        # Only offer properties below our value threshold
                         if strategic_value < prop.price * self.property_value_threshold:
                             # Validate if property can be in trade offer
                             if not GameValidation.validate_property_in_trade_offer(game_state, prop, self):
@@ -485,21 +630,9 @@ class AlgorithmicAgent(Player):
                         trade_offers.append(trade_offer)
 
         return trade_offers
-        
+
+
     def handle_bankruptcy(self, game_state: GameState, amount: int) -> BankruptcyRequest:
-        """
-        Handle potential bankruptcy by suggesting actions to raise funds.
-        
-        This strategy prioritizes maintaining strategic property groups and selling 
-        less valuable assets first.
-        
-        Args:
-            game_state: Current game state
-            amount: The amount needed
-            
-        Returns:
-            BankruptcyRequest object with suggestions to avoid bankruptcy
-        """
         current_balance = game_state.player_balances.get(self, 0)
         if current_balance >= amount:
             return BankruptcyRequest([], [], [])
