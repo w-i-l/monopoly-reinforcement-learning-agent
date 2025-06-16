@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from copy import deepcopy
 from datetime import datetime as Date
 from pathlib import Path
+from pydantic import BaseModel
 
 from game.game_state import GameState
 from game.player import Player
@@ -19,7 +20,11 @@ from models.railway import Railway
 from models.utility import Utility
 from models.trade_offer import TradeOffer
 from utils.logger import ErrorLogger
-from server.server_models.property import Property as ServerProperty
+
+
+class ServerProperty(BaseModel):
+    id: int
+    name: str
 
 
 class HumanAgent(Player):
