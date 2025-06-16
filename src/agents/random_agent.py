@@ -1,28 +1,64 @@
+import random
+from typing import List
+import numpy as np
+
 from game.player import Player
 from game.game_state import GameState
 from models.tile import Tile
 from models.property_group import PropertyGroup
-import random
-from typing import List
 from models.property import Property
 from models.utility import Utility
 from models.railway import Railway
 from models.trade_offer import TradeOffer
-import numpy as np
 from game.game_validation import GameValidation
 from game.bankruptcy_request import BankruptcyRequest
 
+
 class RandomAgent(Player):
-    def __init__(self, name, cache_size=5000):
+    """
+    Random baseline agent for Monopoly that makes decisions using cached random choices.
+    
+    This agent serves as a baseline for comparison with more sophisticated agents by
+    making purely random decisions for all game actions. All decisions are subject to
+    game rule validation, with invalid actions being skipped automatically.
+    
+    The agent uses a pre-generated cache of random boolean values for performance
+    optimization, avoiding repeated calls to random number generation during gameplay.
+
+    Attributes
+    ----------
+    cache_size : int
+        Size of the pre-generated random choice cache for performance optimization
+    _cache : List[bool]
+        Internal cache of pre-generated random boolean values
+    """
+
+
+    def __init__(self, name: str, cache_size: int = 5000):
+        """
+        Initialize a new RandomAgent with cached random choices.
+        
+        Parameters
+        ----------
+        name : str
+            Display name for this agent used in games and tournaments
+        cache_size : int, default 5000
+            Number of random boolean values to pre-generate for performance
+        """
         self.cache_size = cache_size
         super().__init__(name)
         self.__populate_cache()
 
 
     def __populate_cache(self):
+        """
+        Generate a cache of random boolean values for decision making.
+        
+        Creates cache_size random values converted to boolean using 0.5 threshold.
+        Called automatically during initialization and when cache is depleted.
+        """
         # generating a list of boolean values
         # with a size of cache_size
-
         self._cache = np.random.rand(self.cache_size)
         # converting the values to boolean
         self._cache = self._cache > 0.5
@@ -30,6 +66,14 @@ class RandomAgent(Player):
 
 
     def random_choice(self) -> bool:
+        """
+        Get the next random boolean choice from the cache.
+        
+        Returns
+        -------
+        bool
+            Random boolean value, with cache automatically replenished when empty
+        """
         if len(self._cache) == 0:
             self.__populate_cache()
 
@@ -49,7 +93,9 @@ class RandomAgent(Player):
 
     def get_mortgaging_suggestions(self, game_state: GameState) -> List[Tile]:
         properties = game_state.properties[self]
-        properties = [property for property in properties if isinstance(property, Property)]
+        # filtering only properties
+        properties = [tile for tile in properties if isinstance(tile, Property)]
+        # filtering out mortgaged properties
         properties = [property for property in properties if not property in game_state.mortgaged_properties]
 
         suggestions = []
@@ -69,7 +115,9 @@ class RandomAgent(Player):
     
     def get_unmortgaging_suggestions(self, game_state: GameState) -> List[Tile]:
         properties = game_state.properties[self]
-        properties = [property for property in properties if isinstance(property, Property)]
+        # filtering only properties
+        properties = [tile for tile in properties if isinstance(tile, Property)]
+        # filtering out unmortgaged properties
         properties = [property for property in properties if property in game_state.mortgaged_properties]
 
         suggestions = []
@@ -89,7 +137,9 @@ class RandomAgent(Player):
 
     def get_upgrading_suggestions(self, game_state: GameState) -> List[PropertyGroup]:
         properties = game_state.properties[self]
+        # filtering only properties
         properties = [property for property in properties if isinstance(property, Property)]
+        # grouping properties by their group
         grouped_properties = {property.group: [] for property in properties if isinstance(property, Property)}
 
         for property in properties:
@@ -115,6 +165,8 @@ class RandomAgent(Player):
                         pass
                     else:
                         price = group.house_cost() * group_len
+                        # if we can afford to build a house
+                        # and we should upgrade
                         if budget >= price and should_upgrade:
                             suggestions.append(group)
                             budget -= price
@@ -124,6 +176,8 @@ class RandomAgent(Player):
                     if error := GameValidation.validate_place_hotel(game_state, self, group):
                         pass
                     else:
+                        # if we can afford to build a hotel
+                        # and we should upgrade
                         price = group.hotel_cost() * group_len
                         if budget >= price and should_upgrade:
                             suggestions.append(group)
@@ -132,9 +186,11 @@ class RandomAgent(Player):
         return suggestions
     
 
-    def get_downgrading_suggestions(self, game_state: GameState) -> List[Tile]:
+    def get_downgrading_suggestions(self, game_state: GameState) -> List[PropertyGroup]:
         properties = game_state.properties[self]
+        # filtering only properties
         properties = [property for property in properties if isinstance(property, Property)]
+        # grouping properties by their group
         grouped_properties = {property.group: [] for property in properties if isinstance(property, Property)}
 
         for property in properties:
@@ -185,14 +241,14 @@ class RandomAgent(Player):
         return cards > 0 and should_use
     
 
-    def should_accept_trade_offer(self, game_state, trade_offer):
+    def should_accept_trade_offer(self, game_state: GameState, trade_offer: TradeOffer) -> bool:
         if error := GameValidation.validate_trade_offer(game_state, trade_offer):
             return False
         
         return self.random_choice()
     
 
-    def get_trade_offers(self, game_state) -> List[TradeOffer]:
+    def get_trade_offers(self, game_state: GameState) -> List[TradeOffer]:
         trade_offers = []
 
         for player in game_state.players:
