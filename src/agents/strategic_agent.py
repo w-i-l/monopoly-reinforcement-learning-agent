@@ -1,17 +1,19 @@
+from typing import List, Dict, Optional, Set, Tuple
+import random
+import math
+from collections import defaultdict
+
 from game.player import Player
 from game.game_state import GameState
+from game.game_validation import GameValidation
+from game.bankruptcy_request import BankruptcyRequest
 from models.tile import Tile
 from models.property_group import PropertyGroup
 from models.property import Property
 from models.railway import Railway
 from models.utility import Utility
 from models.trade_offer import TradeOffer
-from game.game_validation import GameValidation
-from game.bankruptcy_request import BankruptcyRequest
-from typing import List, Dict, Optional, Set, Tuple
-import random
-import math
-from collections import defaultdict
+
 
 class StrategicAgent(Player):
     """
@@ -19,6 +21,7 @@ class StrategicAgent(Player):
     configurable parameters and game state analysis.
     """
     
+
     def __init__(self, name: str, strategy_params: Optional[Dict] = None, can_be_referenced: bool = False):
         """
         Initialize the strategic agent with optional custom parameters.
@@ -27,8 +30,9 @@ class StrategicAgent(Player):
             name: The player's name
             strategy_params: Optional dictionary of strategy parameters that will override defaults
         """
+
         super().__init__(name, can_be_referenced=can_be_referenced)
-        # Initialize with default strategy parameters
+
         self.strategy_params = self._get_default_params()
         # Override with any provided parameters
         if strategy_params:
@@ -40,6 +44,7 @@ class StrategicAgent(Player):
         self._last_valuation_turn = -1
         self._current_turn = 0
             
+
     def _get_default_params(self) -> Dict:
         """
         Default strategy parameters that define the agent's behavior.
@@ -47,6 +52,7 @@ class StrategicAgent(Player):
         Returns:
             Dictionary of default strategy parameters
         """
+
         return {
             # Property acquisition
             "min_cash_reserve": 150,  # Minimum cash to keep on hand
@@ -93,14 +99,17 @@ class StrategicAgent(Player):
             "danger_zone_weight": 1.2,  # Weight for dangerous zones (7-9 spaces after jail)
         }
     
+
     def _update_turn_counter(self, game_state: GameState) -> None:
         """
         Update the internal turn counter based on the game state.
         """
+
         # Approximate turn calculation based on properties owned
         total_properties = sum(len(props) for props in game_state.properties.values())
         self._current_turn = max(self._current_turn, total_properties // len(game_state.players) + 1)
     
+
     def _calculate_property_values(self, game_state: GameState) -> Dict[Tile, float]:
         """
         Calculate the strategic value of all properties on the board.
@@ -111,6 +120,7 @@ class StrategicAgent(Player):
         Returns:
             Dictionary mapping tiles to their calculated values
         """
+
         # Check if we need to recalculate values (only do once per turn for efficiency)
         self._update_turn_counter(game_state)
         if self._current_turn == self._last_valuation_turn and self._property_values:
@@ -134,6 +144,7 @@ class StrategicAgent(Player):
         self._property_values = values
         return values
     
+
     def _analyze_property_groups(self, game_state: GameState) -> Dict[PropertyGroup, Dict]:
         """
         Analyze the completion status of all property groups.
@@ -144,6 +155,7 @@ class StrategicAgent(Player):
         Returns:
             Dictionary mapping property groups to their completion info
         """
+
         result = {}
         
         for group in PropertyGroup:
@@ -182,6 +194,7 @@ class StrategicAgent(Player):
             
         return result
     
+
     def _calculate_property_value(self, game_state: GameState, property: Property) -> float:
         """
         Calculate the strategic value of a property.
@@ -242,6 +255,7 @@ class StrategicAgent(Player):
         
         return value
     
+    
     def _calculate_railway_value(self, game_state: GameState, railway: Railway) -> float:
         """
         Calculate the strategic value of a railway.
@@ -253,7 +267,7 @@ class StrategicAgent(Player):
         Returns:
             Calculated railway value
         """
-        # Base value
+
         base_value = railway.price
         
         # Count how many railways we already own
@@ -275,6 +289,7 @@ class StrategicAgent(Player):
         
         return value
     
+    
     def _calculate_utility_value(self, game_state: GameState, utility: Utility) -> float:
         """
         Calculate the strategic value of a utility.
@@ -286,7 +301,7 @@ class StrategicAgent(Player):
         Returns:
             Calculated utility value
         """
-        # Base value
+
         base_value = utility.price
         
         # Count how many utilities we already own
@@ -303,6 +318,7 @@ class StrategicAgent(Player):
         value = (base_value + rent_value) * self.strategy_params["utility_value_multiplier"]
         
         return value
+    
     
     def _calculate_property_roi(self, game_state: GameState, property: Property) -> float:
         """
@@ -321,6 +337,7 @@ class StrategicAgent(Player):
         property_value = self._calculate_property_value(game_state, property)
         return property_value / property.price
     
+
     def _calculate_development_roi(self, game_state: GameState, group: PropertyGroup) -> float:
         """
         Calculate the ROI for developing houses/hotels on a property group.
@@ -388,6 +405,7 @@ class StrategicAgent(Player):
             # Calculate ROI
             return rent_increase / cost if cost > 0 else 0
     
+
     def _assess_board_danger(self, game_state: GameState) -> float:
         """
         Assess how dangerous the board currently is for this player.
@@ -486,6 +504,7 @@ class StrategicAgent(Player):
             
         return danger_score
     
+
     def _can_afford(self, game_state: GameState, cost: int) -> bool:
         """
         Check if the agent can afford a cost while maintaining minimum cash reserve.
@@ -497,9 +516,11 @@ class StrategicAgent(Player):
         Returns:
             True if the agent can afford the cost, False otherwise
         """
+
         cash = game_state.player_balances[self]
         return cash - cost >= self.strategy_params["min_cash_reserve"]
     
+
     def _emergency_can_afford(self, game_state: GameState, cost: int) -> bool:
         """
         Check if the agent can afford a cost in an emergency situation.
@@ -514,17 +535,8 @@ class StrategicAgent(Player):
         cash = game_state.player_balances[self]
         return cash >= cost
     
+    
     def should_buy_property(self, game_state: GameState, property: Tile) -> bool:
-        """
-        Decide whether to buy a property.
-        
-        Args:
-            game_state: Current game state
-            property: The property to consider buying
-            
-        Returns:
-            True if the agent should buy the property, False otherwise
-        """
         # Validate property purchase
         if error := GameValidation.validate_buy_property(game_state, self, property):
             return False
@@ -564,16 +576,8 @@ class StrategicAgent(Player):
         # Otherwise, be more selective
         return is_good_value and can_afford and property_value > property.price * 1.3
     
+
     def get_upgrading_suggestions(self, game_state: GameState) -> List[PropertyGroup]:
-        """
-        Suggest which properties to upgrade with houses or hotels.
-        
-        Args:
-            game_state: Current game state
-            
-        Returns:
-            List of property groups to upgrade
-        """
         suggestions = []
         cash = game_state.player_balances[self]
         
@@ -633,16 +637,8 @@ class StrategicAgent(Player):
                             
         return suggestions
     
+    
     def get_mortgaging_suggestions(self, game_state: GameState) -> List[Tile]:
-        """
-        Suggest which properties to mortgage.
-        
-        Args:
-            game_state: Current game state
-            
-        Returns:
-            List of properties to mortgage
-        """
         cash = game_state.player_balances[self]
         emergency = cash < self.strategy_params["mortgage_emergency_threshold"]
         suggestions = []
@@ -716,16 +712,8 @@ class StrategicAgent(Player):
                             
         return suggestions
     
+    
     def get_unmortgaging_suggestions(self, game_state: GameState) -> List[Tile]:
-        """
-        Suggest which properties to unmortgage.
-        
-        Args:
-            game_state: Current game state
-            
-        Returns:
-            List of properties to unmortgage
-        """
         cash = game_state.player_balances[self]
         
         # Don't unmortgage if cash is below threshold
@@ -777,16 +765,8 @@ class StrategicAgent(Player):
                         
         return suggestions
     
+    
     def get_downgrading_suggestions(self, game_state: GameState) -> List[PropertyGroup]:
-        """
-        Suggest which properties to downgrade (sell houses/hotels).
-        
-        Args:
-            game_state: Current game state
-            
-        Returns:
-            List of property groups to downgrade
-        """
         cash = game_state.player_balances[self]
         emergency = cash < self.strategy_params["mortgage_emergency_threshold"]
         
@@ -874,15 +854,6 @@ class StrategicAgent(Player):
         return suggestions
     
     def should_pay_get_out_of_jail_fine(self, game_state: GameState) -> bool:
-        """
-        Decide whether to pay the fine to get out of jail.
-        
-        Args:
-            game_state: Current game state
-            
-        Returns:
-            True if the agent should pay to get out of jail, False otherwise
-        """
         # Validate if player is in jail
         if not game_state.in_jail.get(self, False):
             return False
@@ -911,17 +882,9 @@ class StrategicAgent(Player):
                 
             # Otherwise, pay to get out
             return True
+        
     
     def should_use_escape_jail_card(self, game_state: GameState) -> bool:
-        """
-        Decide whether to use a Get Out of Jail Free card.
-        
-        Args:
-            game_state: Current game state
-            
-        Returns:
-            True if the agent should use a card, False otherwise
-        """
         # Validate if player is in jail
         if not game_state.in_jail.get(self, False):
             return False
@@ -990,6 +953,7 @@ class StrategicAgent(Player):
         
         return total_value
 
+
     def _calculate_monopoly_impact(self, game_state: GameState, properties_gained: List[Tile], 
                                 properties_lost: List[Tile]) -> Dict[str, float]:
         """
@@ -1039,6 +1003,7 @@ class StrategicAgent(Player):
         
         return impact
 
+
     def _evaluate_cash_impact(self, game_state: GameState, cash_change: int) -> Dict[str, float]:
         """
         Evaluate the impact of cash changes on our position.
@@ -1082,17 +1047,8 @@ class StrategicAgent(Player):
         
         return impact
 
+
     def should_accept_trade_offer(self, game_state: GameState, trade_offer: TradeOffer) -> bool:
-        """
-        Enhanced trade acceptance logic with comprehensive strategic analysis.
-        
-        Args:
-            game_state: Current game state
-            trade_offer: The trade offer to consider
-            
-        Returns:
-            True if the agent should accept the trade, False otherwise
-        """
         # Validate trade offer
         if error := GameValidation.validate_trade_offer(game_state, trade_offer):
             return False
@@ -1203,16 +1159,8 @@ class StrategicAgent(Player):
         
         return final_score > 0.1  # Require positive score with buffer
 
+
     def get_trade_offers(self, game_state: GameState) -> List[TradeOffer]:
-        """
-        Enhanced trade offer generation with sophisticated strategic analysis.
-        
-        Args:
-            game_state: Current game state
-            
-        Returns:
-            List of strategic trade offers
-        """
         trade_offers = []
         current_cash = game_state.player_balances[self]
         
@@ -1271,6 +1219,7 @@ class StrategicAgent(Player):
         
         return []
 
+
     def _generate_monopoly_completion_trades(self, game_state: GameState, opponent, 
                                         property_values: Dict, opponent_cash: int) -> List[TradeOffer]:
         """Generate trades focused on completing monopolies."""
@@ -1294,6 +1243,7 @@ class StrategicAgent(Player):
         
         return trades
 
+
     def _generate_monopoly_breaking_trades(self, game_state: GameState, opponent,
                                         property_values: Dict, opponent_cash: int) -> List[TradeOffer]:
         """Generate trades focused on breaking opponent monopolies."""
@@ -1315,6 +1265,7 @@ class StrategicAgent(Player):
                             break  # Only need to break one property per monopoly
         
         return trades
+
 
     def _generate_value_optimization_trades(self, game_state: GameState, opponent,
                                         property_values: Dict, opponent_cash: int) -> List[TradeOffer]:
@@ -1342,6 +1293,7 @@ class StrategicAgent(Player):
                         trades.append(trade)
         
         return trades
+
 
     def _generate_cash_generation_trades(self, game_state: GameState, opponent,
                                     property_values: Dict, opponent_cash: int) -> List[TradeOffer]:
@@ -1375,6 +1327,7 @@ class StrategicAgent(Player):
                         trades.append(trade)
         
         return trades
+
 
     def _create_monopoly_completion_trade(self, game_state: GameState, opponent,
                                         target_property: Property, property_values: Dict, 
@@ -1429,6 +1382,7 @@ class StrategicAgent(Player):
         
         return None
 
+
     def _create_monopoly_breaking_trade(self, game_state: GameState, opponent,
                                     target_property: Property, property_values: Dict,
                                     opponent_cash: int) -> Optional[TradeOffer]:
@@ -1456,6 +1410,7 @@ class StrategicAgent(Player):
         
         return None
 
+
     def _create_value_trade(self, game_state: GameState, opponent, target_property,
                         property_values: Dict, opponent_cash: int) -> Optional[TradeOffer]:
         """Create a value-based trade offer."""
@@ -1481,6 +1436,7 @@ class StrategicAgent(Player):
         
         return None
 
+
     def _find_suitable_trade_properties(self, game_state: GameState, opponent, 
                                     target_property) -> List[Property]:
         """Find properties suitable for trading."""
@@ -1502,6 +1458,7 @@ class StrategicAgent(Player):
         suitable.sort(key=lambda p: p.price)
         return suitable
 
+
     def _score_trade_offer(self, game_state: GameState, trade_offer: TradeOffer) -> float:
         """Score a trade offer for prioritization."""
         # This is a simplified scoring - could be expanded
@@ -1519,261 +1476,8 @@ class StrategicAgent(Player):
         
         return score
     
-    # def should_accept_trade_offer(self, game_state: GameState, trade_offer: TradeOffer) -> bool:
-    #     """
-    #     Decide whether to accept a trade offer.
-        
-    #     Args:
-    #         game_state: Current game state
-    #         trade_offer: The trade offer to consider
-            
-    #     Returns:
-    #         True if the agent should accept the trade, False otherwise
-    #     """
-    #     # Validate trade offer
-    #     if error := GameValidation.validate_trade_offer(game_state, trade_offer):
-    #         return False
-            
-    #     # Calculate value of what we're receiving
-    #     value_receiving = 0
-        
-    #     # Value of properties we're receiving
-    #     property_values = self._calculate_property_values(game_state)
-        
-    #     for prop in trade_offer.properties_offered:
-    #         if prop in property_values:
-    #             value_receiving += property_values[prop]
-                
-    #             # Extra value for completing monopolies
-    #             if isinstance(prop, Property):
-    #                 group_info = self._property_group_completion[prop.group]
-    #                 if group_info["self_owned"] == group_info["total"] - 1:
-    #                     value_receiving += self.strategy_params["trade_monopoly_bonus"]
-        
-    #     # Value of money we're receiving
-    #     value_receiving += trade_offer.money_offered or 0
-        
-    #     # Value of jail cards we're receiving (approximate)
-    #     value_receiving += (trade_offer.jail_cards_offered or 0) * 50
-        
-    #     # Calculate value of what we're giving up
-    #     value_giving = 0
-        
-    #     # Value of properties we're giving up
-    #     for prop in trade_offer.properties_requested:
-    #         if prop in property_values:
-    #             value_giving += property_values[prop]
-                
-    #             # Extra penalty for breaking monopolies
-    #             if isinstance(prop, Property):
-    #                 group_info = self._property_group_completion[prop.group]
-    #                 if group_info["is_monopoly"]:
-    #                     value_giving += self.strategy_params["trade_monopoly_bonus"]
-        
-    #     # Value of money we're giving up
-    #     value_giving += trade_offer.money_requested or 0
-        
-    #     # Value of jail cards we're giving up (approximate)
-    #     value_giving += (trade_offer.jail_cards_requested or 0) * 50
-        
-    #     # Calculate net value gain
-    #     net_value = value_receiving - value_giving
-        
-    #     # Consider trade eagerness parameter
-    #     eagerness_factor = self.strategy_params["trade_eagerness"]
-        
-    #     # More eager traders will accept trades with less net value
-    #     adjusted_threshold = eagerness_factor * 0.9
-        
-    #     # Decision based on net value
-    #     return net_value > 0 or (net_value >= -50 and random.random() < adjusted_threshold)
-    
-    # def get_trade_offers(self, game_state: GameState) -> List[TradeOffer]:
-    #     """
-    #     Generate trade offers for other players.
-        
-    #     Args:
-    #         game_state: Current game state
-            
-    #     Returns:
-    #         List of trade offers
-    #     """
-    #     trade_offers = []
-    #     property_values = self._calculate_property_values(game_state)
-        
-    #     # Don't make trades in certain situations
-    #     cash = game_state.player_balances[self]
-    #     if cash < self.strategy_params["min_cash_reserve"]:
-    #         # Too low on cash, focus on other strategies
-    #         return []
-            
-    #     # For each opponent
-    #     for opponent in game_state.players:
-    #         if opponent == self:
-    #             continue
-                
-    #         # Skip if opponent has very low cash
-    #         opponent_cash = game_state.player_balances[opponent]
-    #         if opponent_cash < 100:  # Arbitrary threshold
-    #             continue
-                
-    #         # Find properties that would complete our monopolies
-    #         wanted_properties = []
-    #         for group, info in self._property_group_completion.items():
-    #             if info["can_complete"] and not info["is_monopoly"]:
-    #                 # Find properties in this group owned by the opponent
-    #                 group_properties = game_state.board.get_properties_by_group(group)
-    #                 for prop in group_properties:
-    #                     if prop in game_state.properties[opponent]:
-    #                         wanted_properties.append(prop)
-            
-    #         # If no interesting properties, skip
-    #         if not wanted_properties:
-    #             continue
-                
-    #         # Determine what we're willing to offer
-    #         offered_properties = []
-            
-    #         # Find properties we're willing to trade
-    #         for prop in game_state.properties[self]:
-    #             # Skip mortgaged properties
-    #             if prop in game_state.mortgaged_properties:
-    #                 continue
-                    
-    #             # Skip properties with houses/hotels
-    #             if isinstance(prop, Property) and (
-    #                 (prop.group in game_state.houses and game_state.houses[prop.group][0] > 0) or 
-    #                 (prop.group in game_state.hotels and game_state.hotels[prop.group][0] > 0)
-    #             ):
-    #                 continue
-                    
-    #             # Skip properties that would complete monopolies for us
-    #             if isinstance(prop, Property):
-    #                 group_info = self._property_group_completion[prop.group]
-    #                 if group_info["can_complete"] and group_info["remaining_needed"] <= 1:
-    #                     continue
-                        
-    #             # Validate if property can be in trade offer
-    #             if not GameValidation.validate_property_in_trade_offer(game_state, prop, self):
-    #                 offered_properties.append(prop)
-            
-    #         # For each wanted property, try to make a fair trade
-    #         for wanted_prop in wanted_properties:
-    #             # Reset offers for each property
-    #             trade_properties = []
-    #             trade_money = 0
-                
-    #             # Validate if wanted property can be in trade offer
-    #             if GameValidation.validate_property_in_trade_offer(game_state, wanted_prop, opponent):
-    #                 continue
-                
-    #             wanted_value = property_values.get(wanted_prop, wanted_prop.price)
-                
-    #             # Add monopoly completion bonus
-    #             if isinstance(wanted_prop, Property):
-    #                 group_info = self._property_group_completion[wanted_prop.group]
-    #                 if group_info["self_owned"] == group_info["total"] - 1:
-    #                     wanted_value += self.strategy_params["trade_monopoly_bonus"]
-                
-    #             # Try to find a property of similar value
-    #             best_match = None
-    #             smallest_diff = float('inf')
-                
-    #             for offer_prop in offered_properties:
-    #                 offer_value = property_values.get(offer_prop, offer_prop.price)
-    #                 diff = abs(offer_value - wanted_value)
-                    
-    #                 if diff < smallest_diff:
-    #                     smallest_diff = diff
-    #                     best_match = offer_prop
-                
-    #             # If we found a reasonable match
-    #             if best_match and smallest_diff <= wanted_value * 0.3:
-    #                 trade_properties.append(best_match)
-                    
-    #                 # Calculate remaining value difference
-    #                 offer_value = property_values.get(best_match, best_match.price)
-    #                 diff = wanted_value - offer_value
-                    
-    #                 # Add money to balance the trade if needed
-    #                 if diff > 0 and cash >= diff + self.strategy_params["min_cash_reserve"]:
-    #                     trade_money = min(diff, opponent_cash)
-                        
-    #                 # Create trade offer
-    #                 trade_offer = TradeOffer(
-    #                     source_player=self,
-    #                     target_player=opponent,
-    #                     properties_offered=trade_properties,
-    #                     money_offered=trade_money,
-    #                     jail_cards_offered=0,
-    #                     properties_requested=[wanted_prop],
-    #                     money_requested=0,
-    #                     jail_cards_requested=0
-    #                 )
-                    
-    #                 # Validate trade offer
-    #                 if not GameValidation.validate_trade_offer(game_state, trade_offer):
-    #                     trade_offers.append(trade_offer)
-                
-    #             # If we didn't find a property match, try money
-    #             elif cash >= wanted_value + self.strategy_params["min_cash_reserve"]:
-    #                 trade_money = min(wanted_value, opponent_cash)
-                    
-    #                 # Create trade offer
-    #                 trade_offer = TradeOffer(
-    #                     source_player=self,
-    #                     target_player=opponent,
-    #                     properties_offered=[],
-    #                     money_offered=trade_money,
-    #                     jail_cards_offered=0,
-    #                     properties_requested=[wanted_prop],
-    #                     money_requested=0,
-    #                     jail_cards_requested=0
-    #                 )
-                    
-    #                 # Validate trade offer
-    #                 if not GameValidation.validate_trade_offer(game_state, trade_offer):
-    #                     trade_offers.append(trade_offer)
-        
-    #     # Limit the number of trade offers
-    #     if trade_offers:
-    #         # Calculate value gain for each offer
-    #         offer_values = []
-            
-    #         for offer in trade_offers:
-    #             value_gaining = sum(property_values.get(prop, prop.price) for prop in offer.properties_requested)
-    #             value_giving = sum(property_values.get(prop, prop.price) for prop in offer.properties_offered) + offer.money_offered
-                
-    #             # Calculate monopoly completion bonuses
-    #             for prop in offer.properties_requested:
-    #                 if isinstance(prop, Property):
-    #                     group_info = self._property_group_completion[prop.group]
-    #                     if group_info["self_owned"] == group_info["total"] - 1:
-    #                         value_gaining += self.strategy_params["trade_monopoly_bonus"]
-                
-    #             net_value = value_gaining - value_giving
-    #             offer_values.append((offer, net_value))
-            
-    #         # Sort by value gain (highest first)
-    #         offer_values.sort(key=lambda x: x[1], reverse=True)
-            
-    #         # Take top 1-2 offers
-    #         result = [offer for offer, _ in offer_values[:min(2, len(offer_values))]]
-    #         return result
-            
-    #     return []
-    
+
     def handle_bankruptcy(self, game_state: GameState, amount: int) -> BankruptcyRequest:
-        """
-        Handle potential bankruptcy by suggesting actions to raise funds.
-        
-        Args:
-            game_state: Current game state
-            amount: The amount needed
-            
-        Returns:
-            BankruptcyRequest object with suggestions to avoid bankruptcy
-        """
         cash = game_state.player_balances[self]
         needed = amount - cash
         
@@ -1815,6 +1519,7 @@ class StrategicAgent(Player):
             
         return bankruptcy_request
     
+
     def _calculate_bankruptcy_funds(self, game_state: GameState, bankruptcy_request: BankruptcyRequest) -> int:
         """
         Calculate how much money would be raised from a bankruptcy request.
@@ -1843,6 +1548,7 @@ class StrategicAgent(Player):
         # Money from trades (not implemented for simplicity)
         
         return funds
+    
     
     def _handle_bankruptcy_mortgaging(self, game_state: GameState, needed: int, mortgage_suggestions: List[Tile]) -> None:
         """
@@ -1893,6 +1599,7 @@ class StrategicAgent(Player):
                 if funds_raised >= needed:
                     break
     
+
     def _handle_bankruptcy_downgrading(self, game_state: GameState, needed: int, downgrade_suggestions: List[PropertyGroup]) -> None:
         """
         Handle bankruptcy by suggesting properties to downgrade (sell houses/hotels).
