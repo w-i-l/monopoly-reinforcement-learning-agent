@@ -304,7 +304,7 @@ class RandomAgent(Player):
         return trade_offers
 
 
-    def handle_banckruptcy(self, game_state: GameState, amount: int) -> BankruptcyRequest:
+    def handle_bankruptcy(self, game_state: GameState, amount: int) -> BankruptcyRequest:
         # Quick return if we have enough money
         current_balance = game_state.player_balances[self]
         if current_balance >= amount:

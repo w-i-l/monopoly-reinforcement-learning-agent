@@ -532,7 +532,7 @@ class GameManager:
             description=f"{current_player} did not have enough money to pay {amount}₩ for {reason}"
         )
 
-        bankruptcy_request = current_player.handle_banckruptcy(self.game_state, amount)
+        bankruptcy_request = current_player.handle_bankruptcy(self.game_state, amount)
         if bankruptcy_request.is_empty():
             # Player is bankrupt
             self.__declare_player_bankrupt(current_player)

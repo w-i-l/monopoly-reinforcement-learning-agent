@@ -239,7 +239,7 @@ class Player(ABC):
         pass
     
 
-    def handle_banckruptcy(self, game_state, amount: int) -> BankruptcyRequest:
+    def handle_bankruptcy(self, game_state, amount: int) -> BankruptcyRequest:
         """
         Handle bankruptcy by proposing actions to raise the required cash.
         
