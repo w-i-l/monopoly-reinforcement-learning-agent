@@ -1,32 +1,86 @@
-from game.game_state import GameState
-from typing import List
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-import asyncio
 import queue
 import threading
 import subprocess
-import sys
 import os
-import signal
 import time
+from typing import List, Optional
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from copy import deepcopy
+from datetime import datetime as Date
 from pathlib import Path
-from utils.logger import ErrorLogger
-from fastapi import HTTPException
-from server.server_models.property import Property as ServerProperty
+
+from game.game_state import GameState
 from game.player import Player
 from models.tile import Tile
 from models.property_group import PropertyGroup
 from models.property import Property
 from models.railway import Railway
 from models.utility import Utility
-from copy import deepcopy
 from models.trade_offer import TradeOffer
-from typing import Optional
-from datetime import datetime as Date
+from utils.logger import ErrorLogger
+from server.server_models.property import Property as ServerProperty
+
 
 class HumanAgent(Player):
-    def __init__(self, name, port=6060, frontend_port=5173):
+    """
+    Human player agent that provides a web-based interface for Monopoly gameplay.
+    
+    This agent creates a FastAPI server to handle game decisions and optionally manages
+    a React frontend for user interaction. It bridges the gap between the game engine
+    and human players by providing RESTful API endpoints for all game decisions.
+    
+    The agent uses a queue-based system for decision handling, where the game engine
+    waits for human input through the web interface. All standard Player methods are
+    implemented to request decisions from the human player via HTTP requests.
+    
+    Key features:
+    - RESTful API server for game state and decision handling
+    - Queue-based decision system with blocking waits
+    - Real-time event streaming to the frontend
+    - Optional frontend process management
+    - CORS-enabled for web interface integration
+    - Comprehensive error handling and logging
+
+    Attributes
+    ----------
+    port : int
+        Port number for the FastAPI server
+    frontend_port : int
+        Port number for the React frontend development server
+    auto_start_frontend : bool
+        Whether to automatically start and manage the frontend process
+    game_state : Optional[GameState]
+        Current game state reference for API endpoints
+    decision_queue : queue.Queue
+        Queue for sending decision requests to the frontend
+    response_queue : queue.Queue
+        Queue for receiving decision responses from the frontend
+    ui_event_queue : queue.Queue
+        Queue for game events to be displayed in the UI
+    server : FastAPI
+        The FastAPI application instance
+    server_thread : threading.Thread
+        Thread running the FastAPI server
+    frontend_process : Optional[subprocess.Popen]
+        Process handle for the frontend development server
+    """
+
+
+    def __init__(self, name: str, port: int = 6060, frontend_port: int = 5173):
+        """
+        Initialize the human agent with web interface capabilities.
+        
+        Parameters
+        ----------
+        name : str
+            Display name for this human player
+        port : int, default 6060
+            Port number for the FastAPI server hosting the game API
+        frontend_port : int, default 5173
+            Port number for the React frontend development server
+        """
+
         super().__init__(name)
         self.port = port
         self.game_state = None
@@ -43,7 +97,19 @@ class HumanAgent(Player):
         self._start_frontend()
 
 
-    def _setup_server(self):
+    def _setup_server(self) -> FastAPI:
+        """
+        Create and configure the FastAPI server with game endpoints.
+        
+        Sets up CORS middleware and defines API routes for game state access,
+        decision handling, and event streaming.
+        
+        Returns
+        -------
+        FastAPI
+            Configured FastAPI application instance
+        """
+
         app = FastAPI()
         
         # Updated CORS middleware configuration
@@ -58,6 +124,7 @@ class HumanAgent(Player):
 
         @app.get("/api/game-state")
         async def get_game_state():
+            """Get current game state formatted for frontend display."""
             try:
                 players = [{
                     "name": str(player),
@@ -85,6 +152,7 @@ class HumanAgent(Player):
             
         @app.post("/api/decision")
         async def make_decision(decision: dict):
+            """Receive decision from frontend and forward to game engine."""
             try:
                 self.response_queue.put(decision['choice'])
                 return {"status": "success"}
@@ -94,6 +162,7 @@ class HumanAgent(Player):
 
         @app.get("/api/pending-decision")
         async def get_pending_decision():
+            """Check for pending decisions that need human input."""
             try:
                 decision_data = self.decision_queue.get_nowait()
                 return decision_data
@@ -105,6 +174,7 @@ class HumanAgent(Player):
             
         @app.get("/api/events")
         async def get_events():
+            """Get all queued game events for display in the UI."""
             events = []
             try:
                 # Get all events from queue without blocking
@@ -120,6 +190,7 @@ class HumanAgent(Player):
     
 
     def _start_server(self):
+        """Start the FastAPI server in a separate thread."""
         def run_server():
             import uvicorn
             config = uvicorn.Config(self.server, host="127.0.0.1", port=self.port, log_level="error")
@@ -140,96 +211,19 @@ class HumanAgent(Player):
         if current_path.name != "src":
             raise FileNotFoundError("Could not find src directory")
         return current_path.parent
-    
-
-    def _create_human_interface(self, components_dir: Path):
-        human_player_dir = components_dir / "HumanPlayer"
-        human_player_dir.mkdir(exist_ok=True)
-
-        interface_path = human_player_dir / "HumanPlayerInterface.jsx"
-        if not interface_path.exists():
-            component_code = """
-    import React, { useState, useEffect } from 'react';
-    import MonopolyBoard from '../Board/MonopolyBoard';
-    import Alert from "../UI/Alert";
-    import { AlertDescription } from "../UI/Alert";
-    import Button from "../UI/Button";
-    import useGameState from '../../hooks/useGameState';
-
-    const HumanPlayerInterface = ({ playerPort = 6060 }) => {  // Added default value
-        const [pendingDecision, setPendingDecision] = useState(null);
-        const [error, setError] = useState(null);
-        const gameState = useGameState();
-
-        useEffect(() => {
-            if (!playerPort) return;  // Added guard
-            
-            const checkDecisions = async () => {
-                try {
-                    const response = await fetch(`http://localhost:${playerPort}/api/pending-decision`);
-                    if (!response.ok) throw new Error('Failed to fetch decisions');
-                    const data = await response.json();
-                    if (data.type !== 'none') {
-                        setPendingDecision(data);
-                    }
-                } catch (err) {
-                    setError(err.message);
-                }
-            };
-
-            const interval = setInterval(checkDecisions, 1000);
-            return () => clearInterval(interval);
-        }, [playerPort]);
-
-        const handleDecision = async (choice) => {
-            if (!playerPort) return;  // Added guard
-            
-            try {
-                const response = await fetch(`http://localhost:${playerPort}/api/decision`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({ choice }),
-                });
-                if (!response.ok) throw new Error('Failed to send decision');
-                setPendingDecision(null);
-            } catch (err) {
-                setError(err.message);
-            }
-        };
-
-        // Rest of the component remains the same
-    """
-            interface_path.write_text(component_code)
-                
-            # Update main.jsx to properly pass the port
-            main_content = f"""
-            import {{ StrictMode }} from 'react';
-            import {{ createRoot }} from 'react-dom/client';
-            import './index.css';
-            import './style.css'
-            import HumanPlayerInterface from './components/HumanPlayer/HumanPlayerInterface';
-
-            const root = createRoot(document.getElementById('root'));
-            root.render(
-                <StrictMode>
-                    <HumanPlayerInterface playerPort={{{self.port}}} />
-                </StrictMode>
-            );
-            """
-
-            project_root = self._get_project_root()
-            frontend_dir = project_root / "frontend"
-            main_dir = frontend_dir / "src" / "main.jsx"
-            with open(main_dir, "w+") as f:
-                f.write(main_content)
-
-        return "HumanPlayerInterface"
 
 
     def _start_frontend(self):
+        """
+        Start the React frontend development server.
+        
+        Launches the frontend using npm run dev and waits for it to become available.
+        
+        Raises
+        ------
+        RuntimeError
+            If the frontend fails to start or become available
+        """
         try:
             project_root = self._get_project_root()
             frontend_dir = project_root / "frontend"
@@ -244,27 +238,6 @@ class HumanAgent(Player):
             # Verify package.json exists
             if not (frontend_dir / "package.json").exists():
                 raise RuntimeError(f"package.json not found in {frontend_dir}")
-
-            # Create the human player interface component
-            component_name = self._create_human_interface(components_dir)
-
-            # Update the main.jsx content
-            main_content = f"""
-    import {{ StrictMode }} from 'react'
-    import {{ createRoot }} from 'react-dom/client'
-    import './index.css'
-    import './style.css'
-    import HumanPlayerInterface from './components/HumanPlayer/HumanPlayerInterface'
-
-    const root = createRoot(document.getElementById('root'))
-    root.render(
-        <StrictMode>
-            <HumanPlayerInterface playerPort={{{self.port}}} />
-        </StrictMode>
-    )
-    """
-            with open(frontend_dir / "src" / "main.jsx", "w") as f:
-                f.write(main_content)
 
             # Start npm process with output logging
             def log_output(process):
@@ -340,6 +313,22 @@ class HumanAgent(Player):
 
 
     def _wait_for_decision(self, decision_type: str, data: dict = None) -> any:
+        """
+        Queue a decision request and wait for human response.
+        
+        Parameters
+        ----------
+        decision_type : str
+            Type of decision being requested
+        data : dict, optional
+            Additional data context for the decision
+            
+        Returns
+        -------
+        any
+            The decision response from the human player
+        """
+
         self.decision_queue.put({
             "type": decision_type,
             "data": data
@@ -347,7 +336,6 @@ class HumanAgent(Player):
         return self.response_queue.get()
 
 
-    # Rest of the agent methods remain the same as in the previous version
     def should_buy_property(self, game_state: GameState, property: Tile) -> bool:
         if not (isinstance(property, Property) or isinstance(property, Railway) or isinstance(property, Utility)):
             return False
@@ -505,6 +493,7 @@ class HumanAgent(Player):
             print(f"Error in should_accept_trade_offer: {e}")
             return False
 
+
     def get_trade_offers(self, game_state: GameState) -> Optional[List[TradeOffer]]:
         try:
             players_data = []
@@ -591,11 +580,18 @@ class HumanAgent(Player):
 
     def on_event_received(self, event):
         """
-        Handle events by storing them and forwarding to the UI.
+        Process game events and forward them to the UI for display.
         
-        Args:
-            event: The Event object
+        Converts game events into a UI-friendly format and queues them
+        for consumption by the frontend. Events are timestamped and
+        marked with opponent flags for proper display.
+        
+        Parameters
+        ----------
+        event : Event
+            The game event to process and display
         """
+
         # Call the parent implementation to log and store in history
         super().on_event_received(event)
         
