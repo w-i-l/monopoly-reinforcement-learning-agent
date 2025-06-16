@@ -4,26 +4,88 @@ import os
 from collections import deque
 import random
 from typing import Dict, List, Tuple, Any, Optional
+import traceback
 
 from agents.strategic_agent import StrategicAgent
 from game.game_state import GameState
-from models.tile import Tile
+from game.player import Player
 from game.game_validation import GameValidation
+from models.tile import Tile
 from models.property import Property
 from models.railway import Railway
 from models.utility import Utility
 from models.property_group import PropertyGroup
 
-import traceback
 
 class DQNAgent(StrategicAgent):
     """
-    DQN (Deep Q-Network) agent for Monopoly that inherits from DefaultStrategicPlayer.
+    Deep Q-Network agent for Monopoly using hybrid strategic and reinforcement learning approach.
     
-    This agent uses deep Q-learning to make decisions for various methods,
-    including property purchases, upgrading suggestions, downgrading suggestions, and jail fine decisions.
+    This agent combines the strategic decision-making capabilities of StrategicAgent with 
+    deep Q-learning for specific decision types. It uses separate neural networks for each 
+    decision method, allowing focused learning and specialized strategies for different 
+    aspects of Monopoly gameplay.
+    
+    The agent supports both training and evaluation modes, with configurable epsilon-greedy 
+    exploration during training. Each decision method can independently use either DQN 
+    (with trained neural networks) or fall back to the parent StrategicAgent implementation.
+    
+    Key features:
+    - Separate Q-networks for each decision type (property buying, upgrading, etc.)
+    - Advanced state encoding with strategic property development metrics
+    - Experience replay with method-specific memory buffers
+    - Target networks for stable Q-learning
+    - Configurable hybrid approach (DQN + strategic fallbacks)
+    - Multi-factor reward calculation based on net worth and strategic objectives
+    
+    Attributes
+    ----------
+    state_dim : int
+        Dimensionality of the encoded game state vector
+    hidden_dims : List[int]
+        Architecture of hidden layers in Q-networks
+    learning_rate : float
+        Learning rate for Adam optimizer
+    gamma : float
+        Discount factor for future rewards
+    epsilon : float
+        Current exploration rate (epsilon-greedy)
+    epsilon_end : float
+        Minimum exploration rate
+    epsilon_decay : float
+        Decay factor for epsilon reduction
+    epsilon_update_freq : int
+        Frequency of epsilon updates (in decision steps)
+    target_update_freq : int
+        Frequency of target network updates
+    batch_size : int
+        Batch size for experience replay training
+    training : bool
+        Whether agent is in training mode (affects exploration)
+    dqn_methods : Dict[str, Optional[str]]
+        Maps decision methods to model paths (None = use parent class)
+    active_training_method : Optional[str]
+        Which method is currently being trained (if any)
+    can_use_defaults_methods : Dict[str, bool]
+        Whether each method can fall back to parent implementation
+    action_dims : Dict[str, int]
+        Action space dimensions for each decision method
+    q_networks : Dict[str, tf.keras.Model]
+        Q-networks for each active DQN method
+    target_networks : Dict[str, tf.keras.Model]
+        Target networks for stable Q-learning
+    optimizers : Dict[str, tf.keras.optimizers.Optimizer]
+        Optimizers for each Q-network
+    memory : Dict[str, deque]
+        Experience replay buffers for each method
+    current_decisions : Dict[str, Optional[Dict]]
+        Stores current decisions for reward calculation
+    epsilon_counter : Dict[str, int]
+        Step counters for epsilon decay per method
+    update_counter : int
+        Global counter for target network updates
     """
-    
+
     def __init__(
         self,
         name: str,
@@ -34,7 +96,7 @@ class DQNAgent(StrategicAgent):
         epsilon_start: float = 1.0,
         epsilon_end: float = 0.1,
         epsilon_decay: float = 0.995,
-        epsilon_update_freq = 100,
+        epsilon_update_freq: int = 100,
         target_update_freq: int = 10,
         memory_size: int = 10000,
         batch_size: int = 64,
@@ -42,9 +104,55 @@ class DQNAgent(StrategicAgent):
         training: bool = True,
         dqn_methods: Dict[str, Optional[str]] = None,
         active_training_method: Optional[str] = None,
-        can_use_defaults_methods: dict[str, bool] = None
+        can_use_defaults_methods: Dict[str, bool] = None
     ):
-        # Initialize parent class
+        """
+        Initialize DQN agent with neural networks and strategic capabilities.
+        
+        Parameters
+        ----------
+        name : str
+            Display name for this agent
+        state_dim : int, default 100
+            Dimensionality of the encoded game state vector used as input to networks
+        hidden_dims : List[int], default [128, 64, 32]
+            List specifying the number of neurons in each hidden layer of Q-networks
+        learning_rate : float, default 0.001
+            Learning rate for Adam optimizer used in all Q-networks
+        gamma : float, default 0.99
+            Discount factor for future rewards in Q-learning updates
+        epsilon_start : float, default 1.0
+            Initial exploration rate for epsilon-greedy policy
+        epsilon_end : float, default 0.1
+            Minimum exploration rate (epsilon floor)
+        epsilon_decay : float, default 0.995
+            Multiplicative decay factor applied to epsilon
+        epsilon_update_freq : int, default 100
+            Number of decisions between epsilon decay updates
+        target_update_freq : int, default 10
+            Number of training steps between target network updates
+        memory_size : int, default 10000
+            Maximum size of experience replay buffer for each method
+        batch_size : int, default 64
+            Batch size for experience replay training
+        strategy_params : Optional[Dict], default None
+            Strategy parameters passed to parent StrategicAgent class
+        training : bool, default True
+            Whether agent is in training mode (enables exploration and learning)
+        dqn_methods : Dict[str, Optional[str]], default None
+            Maps method names to model paths. None values use parent class implementation.
+            Available methods: 'buy_property', 'get_upgrading_suggestions', 
+            'get_downgrading_suggestions', 'should_pay_get_out_of_jail_fine',
+            'should_use_escape_jail_card', 'get_mortgaging_suggestions',
+            'get_unmortgaging_suggestions'
+        active_training_method : Optional[str], default None
+            Which single method is currently being trained. Only this method will
+            use epsilon-greedy exploration and store experiences for learning
+        can_use_defaults_methods : Dict[str, bool], default None
+            For each method, whether it can fall back to parent StrategicAgent
+            implementation when DQN is not available
+        """
+
         super().__init__(name, strategy_params, can_be_referenced=True)
         
         # DQN specific parameters
@@ -141,7 +249,14 @@ class DQNAgent(StrategicAgent):
 
 
     def _init_networks(self):
-        """Initialize Q-network and target network for each active decision type."""
+        """
+        Initialize Q-networks and target networks for each active decision method.
+        
+        Creates separate neural networks for each method specified in dqn_methods
+        or active_training_method. Each network has identical architecture but
+        different output dimensions based on the action space of the method.
+        """
+
         try:
             # Initialize or load networks for each method using DQN
             for method, model_path in self.dqn_methods.items():
@@ -169,8 +284,22 @@ class DQNAgent(StrategicAgent):
             import traceback
             traceback.print_exc()
 
-    def _build_q_network(self, decision_type):
-        """Build a Q-network for a specific decision type."""
+
+    def _build_q_network(self, decision_type: str) -> tf.keras.Model:
+        """
+        Build a Q-network for a specific decision type.
+        
+        Parameters
+        ----------
+        decision_type : str
+            The decision method this network will handle
+            
+        Returns
+        -------
+        tf.keras.Model
+            Compiled Q-network with appropriate output dimensions
+        """
+
         inputs = tf.keras.layers.Input(shape=(self.state_dim,))
         x = inputs
         
@@ -188,17 +317,27 @@ class DQNAgent(StrategicAgent):
         return model
     
 
-    def _calculate_property_value(self, game_state: GameState, property_tile) -> float:
+    def _calculate_property_value(self, game_state: GameState, property_tile: Tile) -> float:
         """
-        Robust implementation of property value calculation that doesn't rely on parent class state.
+        Calculate strategic property value without relying on parent class state.
         
-        Args:
-            game_state: Current game state
-            property_tile: The property to evaluate
+        Provides robust property valuation that works in both training and evaluation
+        modes, handling observer scenarios where the agent may not be an active player.
+        
+        Parameters
+        ----------
+        game_state : GameState
+            Current game state
+        property_tile : Tile
+            Property to evaluate
             
-        Returns:
-            Calculated property value
+        Returns
+        -------
+        float
+            Calculated strategic value considering rent potential, location bonuses,
+            and completion synergies
         """
+
         try:
             # Determine which player to use for calculations
             # If self is in game_state.players, use self. Otherwise, use the first player.
@@ -304,10 +443,28 @@ class DQNAgent(StrategicAgent):
             traceback.print_exc()
             return property_tile.price * 1.2  # Simple fallback value
 
+
     def encode_state(self, game_state: GameState, property_tile: Optional[Tile] = None) -> np.ndarray:
         """
-        Enhanced state encoding with focus on strategic property development metrics.
+        Encode game state into feature vector for neural network input.
+        
+        Creates comprehensive state representation including player finances,
+        property ownership patterns, development levels, strategic metrics,
+        and property-specific features for buying decisions.
+        
+        Parameters
+        ----------
+        game_state : GameState
+            Current game state to encode
+        property_tile : Optional[Tile], default None
+            Specific property being considered (for buying decisions)
+            
+        Returns
+        -------
+        np.ndarray
+            Normalized feature vector of length state_dim
         """
+
         # Determine the current player and opponent
         if self in game_state.players:
             current_player = self
@@ -549,16 +706,39 @@ class DQNAgent(StrategicAgent):
         
         return np.array(features, dtype=np.float32)
     
+
     def calculate_reward(self, 
-                game_state: GameState,
-                player,
-                next_game_state: Optional[GameState] = None,
-                done: bool = False,
-                decision_type: str = 'buy_property') -> float:
+                        game_state: GameState,
+                        player: Player,
+                        next_game_state: Optional[GameState] = None,
+                        done: bool = False,
+                        decision_type: str = 'buy_property') -> float:
         """
-        Enhanced reward function that better captures strategic value.
-        Updated to include downgrading, jail fine, and escape jail card decisions.
+        Calculate reward for a decision based on strategic outcomes.
+        
+        Computes multi-factor reward considering net worth changes, strategic
+        objectives specific to the decision type, cash management, and
+        long-term positioning. Rewards are normalized and decision-specific.
+        
+        Parameters
+        ----------
+        game_state : GameState
+            Previous game state
+        player : Player
+            Player who made the decision
+        next_game_state : Optional[GameState], default None
+            Resulting game state after decision
+        done : bool, default False
+            Whether the game ended
+        decision_type : str, default 'buy_property'
+            Type of decision being rewarded
+            
+        Returns
+        -------
+        float
+            Calculated reward value (typically -1.0 to 1.0)
         """
+
         # Calculate current net worth
         current_net_worth = game_state.get_player_net_worth(player)
         
@@ -875,17 +1055,23 @@ class DQNAgent(StrategicAgent):
         return 0.1
     
 
-    def _assess_board_danger_simple(self, game_state: GameState, player) -> float:
+    def _assess_board_danger_simple(self, game_state: GameState, player: Player) -> float:
         """
         Simplified board danger assessment for jail decisions.
         
-        Args:
-            game_state: Current game state
-            player: Player to assess danger for
+        Parameters
+        ----------
+        game_state : GameState
+            Current game state
+        player : Player
+            Player to assess danger for
             
-        Returns:
+        Returns
+        -------
+        float
             Danger score between 0-1 (higher means more dangerous)
         """
+
         current_position = game_state.player_positions[player]
         
         danger_score = 0
@@ -911,17 +1097,8 @@ class DQNAgent(StrategicAgent):
         
         return danger_score / checks if checks > 0 else 0
     
+
     def should_buy_property(self, game_state: GameState, property_tile: Tile) -> bool:
-        """
-        Decide whether to buy a property using the DQN policy.
-        
-        Args:
-            game_state: Current game state
-            property_tile: The property tile being considered
-            
-        Returns:
-            True if the agent decides to buy, False otherwise
-        """
         # First validate we can buy this property
         if error := GameValidation.validate_buy_property(game_state, self, property_tile):
             return False
@@ -1002,16 +1179,8 @@ class DQNAgent(StrategicAgent):
             # Fall back to parent implementation
             return super().should_buy_property(game_state, property_tile)
 
+
     def get_upgrading_suggestions(self, game_state: GameState) -> List[PropertyGroup]:
-        """
-        Decide which property groups to upgrade using the DQN policy.
-        
-        Args:
-            game_state: Current game state
-            
-        Returns:
-            List of PropertyGroup to upgrade
-        """
         # Check if we should use DQN for this method
         method = 'get_upgrading_suggestions'
         if method not in self.q_networks:
@@ -1132,15 +1301,6 @@ class DQNAgent(StrategicAgent):
 
     
     def should_pay_get_out_of_jail_fine(self, game_state: GameState) -> bool:
-        """
-        Decide whether to pay the fine to get out of jail using the DQN policy.
-        
-        Args:
-            game_state: Current game state
-            
-        Returns:
-            True if the agent decides to pay the fine, False otherwise
-        """
         # First validate we're actually in jail and can pay
         if error := GameValidation.validate_pay_get_out_of_jail_fine(game_state, self):
             # If validation fails, we can't pay - return False
@@ -1212,15 +1372,6 @@ class DQNAgent(StrategicAgent):
         
 
     def get_downgrading_suggestions(self, game_state: GameState) -> List[PropertyGroup]:
-        """
-        Decide which property groups to downgrade using the DQN policy.
-        
-        Args:
-            game_state: Current game state
-            
-        Returns:
-            List of PropertyGroup to downgrade
-        """
         # Check if we should use DQN for this method
         method = 'get_downgrading_suggestions'
         if method not in self.q_networks:
@@ -1346,15 +1497,6 @@ class DQNAgent(StrategicAgent):
         
     
     def should_use_escape_jail_card(self, game_state: GameState) -> bool:
-        """
-        Decide whether to use a Get Out of Jail Free card using the DQN policy.
-        
-        Args:
-            game_state: Current game state
-            
-        Returns:
-            True if the agent decides to use the card, False otherwise
-        """
         # First validate we're actually in jail and have a card
         if not game_state.in_jail.get(self, False):
             return False
@@ -1422,15 +1564,6 @@ class DQNAgent(StrategicAgent):
         
 
     def get_mortgaging_suggestions(self, game_state: GameState) -> List[Tile]:
-        """
-        Decide which properties to mortgage using the DQN policy.
-        
-        Args:
-            game_state: Current game state
-            
-        Returns:
-            List of Tile objects to mortgage
-        """
         # Check if we should use DQN for this method
         method = 'get_mortgaging_suggestions'
         if method not in self.q_networks:
@@ -1566,15 +1699,6 @@ class DQNAgent(StrategicAgent):
         
 
     def get_unmortgaging_suggestions(self, game_state: GameState) -> List[Tile]:
-        """
-        Decide which properties to unmortgage using the DQN policy.
-        
-        Args:
-            game_state: Current game state
-            
-        Returns:
-            List of Tile objects to unmortgage
-        """
         # Check if we should use DQN for this method
         method = 'get_unmortgaging_suggestions'
         if method not in self.q_networks:
@@ -1709,13 +1833,18 @@ class DQNAgent(StrategicAgent):
         
     def update_decision(self, method: str, next_game_state: GameState, done: bool = False):
         """
-        Update a decision with its reward and add to memory.
+        Update a stored decision with its outcome and add to experience replay.
         
-        Args:
-            method: The decision method to update
-            next_game_state: The next game state
-            done: Whether the game is done
+        Parameters
+        ----------
+        method : str
+            The decision method to update
+        next_game_state : GameState
+            The resulting game state
+        done : bool, default False
+            Whether the game ended
         """
+
         if method in self.current_decisions and self.current_decisions[method]:
             try:
                 # Calculate reward
@@ -1750,13 +1879,22 @@ class DQNAgent(StrategicAgent):
                 print(f"Error updating {method} decision: {e}")
                 self.current_decisions[method] = None
 
-    def train_on_batch(self, method: str):
+
+    def train_on_batch(self, method: str) -> Optional[float]:
         """
-        Train the networks for a specific method using a random batch from memory.
+        Train Q-network using a batch of experiences from replay buffer.
         
-        Args:
-            method: The decision method to train
+        Parameters
+        ----------
+        method : str
+            The decision method to train
+            
+        Returns
+        -------
+        Optional[float]
+            Training loss value, or None if training wasn't performed
         """
+
         if method not in self.q_networks or method not in self.memory:
             return
             
@@ -1834,14 +1972,19 @@ class DQNAgent(StrategicAgent):
         
         return loss.numpy()  # Return loss value for tracking
 
+
     def save_model_for_method(self, method: str, path: str):
         """
-        Save network and parameters for a specific method to disk.
+        Save neural network weights and parameters for a specific method.
         
-        Args:
-            method: The decision method
-            path: Base path to save the model
+        Parameters
+        ----------
+        method : str
+            The decision method to save
+        path : str
+            Base file path for saving model files
         """
+
         if method not in self.q_networks:
             print(f"No model to save for method {method}")
             return
@@ -1874,14 +2017,19 @@ class DQNAgent(StrategicAgent):
         
         print(f"Model for method {method} saved to {path}")
 
+
     def load_model_for_method(self, method: str, path: str):
         """
-        Load network and parameters for a specific method from disk.
+        Load neural network weights and parameters for a specific method.
         
-        Args:
-            method: The decision method
-            path: Base path to load the model from
+        Parameters
+        ----------
+        method : str
+            The decision method to load
+        path : str
+            Base file path for loading model files
         """
+
         import json
         
         try:
@@ -1914,13 +2062,17 @@ class DQNAgent(StrategicAgent):
             import traceback
             traceback.print_exc()
 
-    def save_model(self, path):
+
+    def save_model(self, path: str):
         """
-        Save all networks and parameters to disk.
+        Save all neural network weights and global parameters.
         
-        Args:
-            path: Base path to save the models
+        Parameters
+        ----------
+        path : str
+            Base file path for saving all model files
         """
+
         os.makedirs(os.path.dirname(path), exist_ok=True)
         
         # Save common parameters
@@ -1948,13 +2100,17 @@ class DQNAgent(StrategicAgent):
         
         print(f"All models saved to {path}")
 
-    def load_model(self, path):
+
+    def load_model(self, path: str):
         """
-        Load all networks and parameters from disk.
+        Load all neural network weights and global parameters.
         
-        Args:
-            path: Base path to load the models from
+        Parameters
+        ----------
+        path : str
+            Base file path for loading all model files
         """
+        
         import json
         
         try:
