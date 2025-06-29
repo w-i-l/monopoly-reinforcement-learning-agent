@@ -51,13 +51,13 @@ def play_against_human_agent(player):
 
 if __name__ == "__main__":
     dqn_methods = {
-        'buy_property': "misc/saved_models/dqn/should_buy/v6/dqn_agent_final",
-        'get_upgrading_suggestions': "misc/saved_models/dqn/upgrading/v5/dqn_upgrading_final",
-        'should_pay_get_out_of_jail_fine': "misc/saved_models/dqn/jail_fine/v2/dqn_agent_final",
-        "get_downgrading_suggestions": "misc/saved_models/dqn/downgrade/v2/dqn_downgrading_final",
-        'get_mortgaging_suggestions': "misc/saved_models/dqn/mortgaging/v2/dqn_mortgaging_final",
-        'get_unmortgaging_suggestions': "misc/saved_models/dqn/unmortgaging/v1/dqn_unmortgaging_final",
-        'should_use_escape_jail_card': "misc/saved_models/dqn/escape_jail_card/v2/dqn_escape_jail_card_final",
+        'buy_property': "misc/saved_models/should_buy/dqn_agent_final",
+        'get_upgrading_suggestions': "misc/saved_models/upgrading/dqn_upgrading_final",
+        'should_pay_get_out_of_jail_fine': "misc/saved_models/jail_fine/dqn_agent_final",
+        "get_downgrading_suggestions": "misc/saved_models/downgrade/dqn_downgrading_final",
+        'get_mortgaging_suggestions': "misc/saved_models/mortgaging/dqn_mortgaging_final",
+        'get_unmortgaging_suggestions': "misc/saved_models/unmortgaging/dqn_unmortgaging_final",
+        'should_use_escape_jail_card': "misc/saved_models/escape_jail_card/dqn_escape_jail_card_final",
     }
 
     can_use_defaults_methods = {
