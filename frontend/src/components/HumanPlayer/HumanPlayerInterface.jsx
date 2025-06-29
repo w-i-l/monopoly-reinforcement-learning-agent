@@ -10,6 +10,8 @@ import EventFeed from "../EventFeed/EventFeed";
 import DiceIcon from "../Dice/Dice";
 import DecisionUI from "../Cards/DecisionCard";
 import PendingDecisionCard from "../Cards/PendingDecisionCard";
+import GameErrorModal from "../Modals/GameErrorModal";
+import GameVictoryModal from "../Modals/GameVictoryModal";
 
 const HumanPlayerInterface = ({ playerPort = 6060 }) => {
   const [pendingDecision, setPendingDecision] = useState(null);
@@ -20,7 +22,7 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [showAcceptTradeModal, setShowAcceptTradeModal] = useState(false);
   const [isNetworkLoading, setIsNetworkLoading] = useState(false);
-
+  const [gameResult, setGameResult] = useState(null);
 
   const {
     gameState,
@@ -30,7 +32,51 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
     error: gameError,
     isLoading,
     actions,
+    refreshGameState,
   } = useGameState();
+
+  // Check if the game has ended
+  useEffect(() => {
+    const checkGameEnd = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:${playerPort}/api/game-result`
+        );
+        if (response.ok) {
+          const result = await response.json();
+          console.log("Game result check:", result); // Debug log
+
+          if (result.game_ended) {
+            setGameResult(result);
+          }
+        } else {
+          console.log("Game result response not ok:", response.status);
+        }
+      } catch (err) {
+        // Game result endpoint not available or game still ongoing
+        console.log("Game result check error:", err.message);
+      }
+    };
+
+    // Only check for game end if we have a valid game state
+    if (gameState && !gameError && !isLoading) {
+      // Check immediately
+      checkGameEnd();
+
+      // Then check every 2 seconds
+      const interval = setInterval(checkGameEnd, 2000);
+      return () => clearInterval(interval);
+    }
+  }, [playerPort, gameState, gameError, isLoading]);
+
+  useEffect(() => {
+    console.log("Component state:", {
+      gameResult,
+      gameError,
+      isLoading,
+      gameState: !!gameState,
+    });
+  }, [gameResult, gameError, isLoading, gameState]);
 
   // USE Effect to handle showing modal on accept trade
   useEffect(() => {
@@ -115,18 +161,40 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
     setSelectedItems(newSelection);
   };
 
+  // If there's a game result, show victory modal
+  if (gameResult && gameResult.game_ended) {
+    console.log("Showing victory modal with result:", gameResult);
+    return (
+      <GameVictoryModal
+        gameResult={gameResult}
+        gameState={gameState}
+        onPlayAgain={() => {
+          setGameResult(null);
+          window.location.reload();
+        }}
+        onClose={() => {
+          window.close();
+        }}
+      />
+    );
+  }
+
+  if (gameError) {
+    return (
+      <GameErrorModal
+        error={gameError}
+        onRetry={() => {
+          console.log("Retrying game state fetch...");
+          if (refreshGameState) {
+            refreshGameState();
+          }
+        }}
+      />
+    );
+  }
 
   return (
     <div className="w-full h-screen max-h-screen overflow-hidden flex">
-      {gameError && (
-        <Alert
-          variant="destructive"
-          className="absolute top-0 left-0 right-0 z-50"
-        >
-          <AlertDescription>{error || gameError}</AlertDescription>
-        </Alert>
-      )}
-
       {/* TRADING MODALS */}
       {showTradeModal && (
         // Use the enhanced CreateTradeModal component

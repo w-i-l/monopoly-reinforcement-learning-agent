@@ -93,11 +93,20 @@ class HumanAgent(Player):
 
         self.decision_queue = queue.Queue()
         self.response_queue = queue.Queue()
-
-        self.ui_event_queue = queue.Queue(maxsize=100)  # Cap at 100 events
+        self.ui_event_queue = queue.Queue(maxsize=100)
+        
+        self.game_result = {
+            "game_ended": False,
+            "winner": None,
+            "bankrupt_players": [],
+            "turn_count": 0,
+            "is_draw": False,
+            "max_turns_reached": False,
+            "player_stats": {},
+            "error": None
+        }
 
         self.server = self._setup_server()
-
         self._start_server()
         self._start_frontend()
 
@@ -190,9 +199,137 @@ class HumanAgent(Player):
                 from utils.logger import ErrorLogger
                 ErrorLogger.log_error(e)
                 return {"events": []}
+            
+        @app.get("/api/game-result")
+        async def get_game_result():
+            """API endpoint to get current game result status"""
+            try:
+                return self.game_result
+            except Exception as e:
+                ErrorLogger.log_error(e)
+                raise HTTPException(status_code=500, detail=str(e))
 
         return app
     
+
+    def set_game_ended(self, winner=None, bankrupt_players=None, turn_count=0, is_draw=False, max_turns_reached=False, error=None):
+        """Update game result when game ends"""
+        
+        # Calculate final stats first
+        final_stats = self._calculate_final_stats() if self.game_state else {}
+        
+        # Update winner status in player stats
+        if winner and final_stats:
+            for player_name in final_stats:
+                final_stats[player_name]["is_winner"] = (player_name == winner)
+        
+        self.game_result.update({
+            "game_ended": True,
+            "winner": winner,
+            "bankrupt_players": bankrupt_players or [],
+            "turn_count": turn_count,
+            "is_draw": is_draw,
+            "max_turns_reached": max_turns_reached,
+            "error": error,
+            "player_stats": final_stats
+        })
+
+
+    def _calculate_final_stats(self):
+        """Calculate final player statistics"""
+        if not self.game_state:
+            return {}
+            
+        stats = {}
+        for player in self.game_state.players:
+            player_name = player.name
+            
+            try:
+                # Count monopolies
+                monopolies = self._count_player_monopolies(player)
+                
+                # Count buildings
+                houses, hotels = self._count_player_buildings(player)
+                
+                # Count mortgaged properties
+                player_properties = self.game_state.properties.get(player, [])
+                mortgaged = sum(1 for prop in player_properties 
+                               if prop in self.game_state.mortgaged_properties)
+                
+                stats[player_name] = {
+                    "final_cash": self.game_state.player_balances.get(player, 0),
+                    "final_net_worth": self.game_state.get_player_net_worth(player),
+                    "properties_owned": len(player_properties),
+                    "monopolies_owned": monopolies,
+                    "houses_built": houses,
+                    "hotels_built": hotels,
+                    "properties_mortgaged": mortgaged,
+                    "is_winner": self.game_result.get("winner") == player_name,
+                    "went_bankrupt": player_name in self.game_result.get("bankrupt_players", [])
+                }
+            except Exception as e:
+                ErrorLogger.log_error(e)
+                # Fallback stats if calculation fails
+                stats[player_name] = {
+                    "final_cash": self.game_state.player_balances.get(player, 0),
+                    "final_net_worth": self.game_state.player_balances.get(player, 0),
+                    "properties_owned": 0,
+                    "monopolies_owned": 0,
+                    "houses_built": 0,
+                    "hotels_built": 0,
+                    "properties_mortgaged": 0,
+                    "is_winner": self.game_result.get("winner") == player_name,
+                    "went_bankrupt": player_name in self.game_result.get("bankrupt_players", [])
+                }
+        
+        return stats
+
+
+    def _count_player_monopolies(self, player):
+        """Count complete monopolies owned by player"""
+        monopolies = 0
+        player_properties = self.game_state.properties.get(player, [])
+        property_groups = {}
+        
+        # Group properties by color
+        for prop in player_properties:
+            if hasattr(prop, 'group'):
+                if prop.group not in property_groups:
+                    property_groups[prop.group] = 0
+                property_groups[prop.group] += 1
+        
+        # Check for complete groups
+        for group, count in property_groups.items():
+            try:
+                group_properties = self.game_state.board.get_properties_by_group(group)
+                if count == len(group_properties):
+                    monopolies += 1
+            except:
+                pass  # Handle any errors in group checking
+        
+        return monopolies
+
+
+    def _count_player_buildings(self, player):
+        """Count houses and hotels owned by player"""
+        houses = 0
+        hotels = 0
+        
+        try:
+            # Count houses
+            for group, house_data in self.game_state.houses.items():
+                if len(house_data) >= 2 and house_data[1] == player:
+                    houses += house_data[0]
+            
+            # Count hotels
+            for group, hotel_data in self.game_state.hotels.items():
+                if len(hotel_data) >= 2 and hotel_data[1] == player:
+                    hotels += hotel_data[0]
+        except Exception as e:
+            ErrorLogger.log_error(e)
+        
+        return houses, hotels
+
 
     def _start_server(self):
         """Start the FastAPI server in a separate thread."""
@@ -205,7 +342,7 @@ class HumanAgent(Player):
         self.server_thread = threading.Thread(target=run_server, daemon=True)
         self.server_thread.start()
         self.server_thread.join(timeout=1) # Wait for server to start
-        print(f"Server started - http://127.0.0.1:{self.port}")
+        print(f"\nServer started - http://127.0.0.1:{self.port}")
 
 
     def _get_project_root(self) -> Path:
@@ -234,7 +371,7 @@ class HumanAgent(Player):
             frontend_dir = project_root / "frontend"
             components_dir = frontend_dir / "src" / "components"
 
-            print(f"Starting frontend from directory: {frontend_dir}")
+            print(f"\nStarting frontend from directory: {frontend_dir}")
 
             # Verify frontend directory exists
             if not frontend_dir.exists():
@@ -290,6 +427,7 @@ class HumanAgent(Player):
                     response = requests.get(f"http://localhost:{self.frontend_port}")
                     if response.status_code == 200:
                         print(f"Frontend successfully started on port {self.frontend_port}")
+                        print(f"Frontend URL: http://localhost:{self.frontend_port}")
                         return
                     else:
                         print(f"Attempt {attempt + 1}: Got status code {response.status_code}")

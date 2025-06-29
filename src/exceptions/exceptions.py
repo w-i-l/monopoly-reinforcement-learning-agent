@@ -382,5 +382,6 @@ class BankrupcyException(NotImplementedHandlerException):
     
     def __init__(self, player_name: str):
         handler_name = "BankrupcyException"
+        self.player_name = player_name
         self.message = f"Player `{player_name}` is bankrupt"
         super().__init__(handler_name, self.message)
