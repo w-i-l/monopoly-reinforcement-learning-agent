@@ -180,7 +180,7 @@ class DQNAgent(StrategicAgent):
         
         # Define which methods should use DQN and which ones inherit from parent
         # Keys are method names, values are either None (use parent) or path to model
-        self.dqn_methods = dqn_methods or {
+        self.dqn_methods =  {
             'buy_property': None,
             'get_upgrading_suggestions': None,
             'get_downgrading_suggestions': None,
@@ -189,6 +189,7 @@ class DQNAgent(StrategicAgent):
             'get_mortgaging_suggestions': None,
             'get_unmortgaging_suggestions': None
         }
+        self.dqn_methods.update(dqn_methods or {})
         
         # Which method is currently being trained (if any)
         self.active_training_method = active_training_method
@@ -204,7 +205,7 @@ class DQNAgent(StrategicAgent):
             'get_unmortgaging_suggestions': 40  # [40 board positions - will filter to mortgaged properties]
         }
 
-        self.can_use_defaults_methods = can_use_defaults_methods or {
+        self.can_use_defaults_methods = {
             'buy_property': False,
             'get_upgrading_suggestions': False,
             'get_downgrading_suggestions': False,
@@ -213,6 +214,7 @@ class DQNAgent(StrategicAgent):
             'get_mortgaging_suggestions': False,
             'get_unmortgaging_suggestions': False
         }
+        self.can_use_defaults_methods.update(can_use_defaults_methods or {})
         
         # Network dictionaries to hold separate networks for each decision
         self.q_networks = {}
@@ -257,12 +259,13 @@ class DQNAgent(StrategicAgent):
         different output dimensions based on the action space of the method.
         """
 
+        print(f"\n### Initializing networks for {self.name} ###\n")
+
         try:
             # Initialize or load networks for each method using DQN
             for method, model_path in self.dqn_methods.items():
                 # Check if this method should use DQN
                 if model_path is not None or method == self.active_training_method:
-                    print(f"Initializing networks for method: {method}")
                     # Build networks for this method
                     self.q_networks[method] = self._build_q_network(method)
                     self.target_networks[method] = self._build_q_network(method)
@@ -283,6 +286,8 @@ class DQNAgent(StrategicAgent):
             print(f"Error initializing networks: {e}")
             import traceback
             traceback.print_exc()
+
+        print("\n ### Finished initializing networks ###\n")
 
 
     def _build_q_network(self, decision_type: str) -> tf.keras.Model:
@@ -2061,6 +2066,8 @@ class DQNAgent(StrategicAgent):
             print(f"Error loading model for method {method}: {e}")
             import traceback
             traceback.print_exc()
+
+        print("\n")
 
 
     def save_model(self, path: str):
