@@ -213,6 +213,10 @@ const UpgradePropertiesDecision = ({
     return String(val).charAt(0).toUpperCase() + String(val).slice(1);
   }
 
+  function formatGroupName(name) {
+    return capitalizeFirstLetter(name.replace("_", " "));
+  }
+
   return (
     <DecisionCard
       title="Upgrade Properties"
@@ -267,7 +271,7 @@ const UpgradePropertiesDecision = ({
                         }}
                       />
                       <h4 className="font-medium text-gray-800">
-                        {capitalizeFirstLetter(group)}
+                        {formatGroupName(group)}
                       </h4>
                     </div>
                     <div className="text-sm bg-white px-2 py-1 rounded-md border border-gray-200 font-medium text-gray-700">

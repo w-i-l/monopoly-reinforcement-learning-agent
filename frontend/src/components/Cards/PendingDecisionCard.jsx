@@ -100,9 +100,9 @@ const PendingDecisionCard = ({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-md overflow-hidden mb-4 max-h-[420px] flex flex-col">
+    <div className="bg-white rounded-xl border border-gray-200 rounded-lg shadow-md mb-4 flex flex-col">
       {/* Header */}
-      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 rounded-t-lg">
         <h3 className="font-bold text-gray-800">Game Status</h3>
       </div>
 
@@ -145,7 +145,7 @@ const PendingDecisionCard = ({
       </div>
 
       {/* Footer */}
-      <div className="p-3 flex gap-3 border-t border-gray-200 bg-gray-50">
+      <div className="p-3 flex gap-3 border-t border-gray-200 bg-gray-50 rounded-b-lg">
         <Button
           onClick={() => handleDecision([])}
           variant="primary"
@@ -154,13 +154,13 @@ const PendingDecisionCard = ({
           Next Decision
         </Button>
 
-        <Button
+        {/* <Button
           onClick={() => setShowEventFeed(!showEventFeed)}
           variant="secondary"
           className="flex-1"
         >
           {showEventFeed ? "Hide Events" : "Show Events"}
-        </Button>
+        </Button> */}
       </div>
     </div>
   );

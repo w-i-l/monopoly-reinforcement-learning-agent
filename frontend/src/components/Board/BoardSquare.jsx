@@ -75,6 +75,10 @@ const BoardSquare = ({
         p-1
         ${getTextColor()}
         ${isMortgaged ? "opacity-50" : ""}
+        ${index === 0 ? "rounded-tl-lg" : ""}
+        ${index === 10 ? "rounded-tr-lg" : ""}
+        ${index === 20 ? "rounded-br-lg" : ""}
+        ${index === 30 ? "rounded-bl-lg" : ""}
       `}
       style={{
         backgroundColor: getBackgroundColor(),

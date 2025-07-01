@@ -93,7 +93,13 @@ class HumanAgent(Player):
 
         self.decision_queue = queue.Queue()
         self.response_queue = queue.Queue()
-        self.ui_event_queue = queue.Queue(maxsize=100)
+        
+        self.event_store = []  # Persistent list of events
+        self.event_store_lock = threading.Lock()  # Thread safety
+        self.last_event_id = 0  # Auto-incrementing event ID
+        
+        # Track which events have been acknowledged/dismissed by the UI
+        self.acknowledged_events = set()
         
         self.game_result = {
             "game_ended": False,
@@ -126,10 +132,9 @@ class HumanAgent(Player):
 
         app = FastAPI()
         
-        # Updated CORS middleware configuration
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["http://localhost:5173"],  # Explicitly allow Vite dev server
+            allow_origins=["http://localhost:5173"],
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
@@ -188,15 +193,51 @@ class HumanAgent(Player):
             
         @app.get("/api/events")
         async def get_events():
-            """Get all queued game events for display in the UI."""
-            events = []
+            """Get all events from persistent storage."""
             try:
-                # Get all events from queue without blocking
-                while not self.ui_event_queue.empty():
-                    events.append(self.ui_event_queue.get_nowait())
-                return {"events": events}
+                with self.event_store_lock:
+                    return {"events": self.event_store.copy()}
             except Exception as e:
-                from utils.logger import ErrorLogger
+                ErrorLogger.log_error(e)
+                return {"events": []}
+        
+        @app.get("/api/events/unacknowledged")
+        async def get_unacknowledged_events():
+            """Get events that haven't been shown in modals yet."""
+            try:
+                with self.event_store_lock:
+                    unacknowledged = [
+                        event for event in self.event_store 
+                        if event['id'] not in self.acknowledged_events
+                    ]
+                    return {"events": unacknowledged}
+            except Exception as e:
+                ErrorLogger.log_error(e)
+                return {"events": []}
+        
+        @app.post("/api/events/acknowledge")
+        async def acknowledge_events(data: dict):
+            """Mark events as acknowledged/seen."""
+            try:
+                event_ids = data.get('event_ids', [])
+                with self.event_store_lock:
+                    self.acknowledged_events.update(event_ids)
+                return {"status": "success", "acknowledged": len(event_ids)}
+            except Exception as e:
+                ErrorLogger.log_error(e)
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @app.get("/api/events/since/{event_id}")
+        async def get_events_since(event_id: int):
+            """Get events since a specific event ID."""
+            try:
+                with self.event_store_lock:
+                    new_events = [
+                        event for event in self.event_store 
+                        if event['id'] > event_id
+                    ]
+                    return {"events": new_events}
+            except Exception as e:
                 ErrorLogger.log_error(e)
                 return {"events": []}
             
@@ -210,6 +251,130 @@ class HumanAgent(Player):
                 raise HTTPException(status_code=500, detail=str(e))
 
         return app
+
+
+    def on_event_received(self, event):
+        """
+        Process game events and store them persistently for UI consumption.
+        
+        CHANGE: Store events persistently instead of using a consumable queue.
+        """
+        # Call the parent implementation to log and store in history
+        super().on_event_received(event)
+        
+        # Convert event to a UI-friendly format with additional data for modals
+        ui_event = {
+            "id": None,  # Will be set below
+            "type": event.type.name,
+            "description": event.description,
+            "player": str(event.player),
+            "target_player": str(event.target_player) if event.target_player else None,
+            "tile": str(event.tile) if event.tile else None,
+            "property_group": str(event.property_group) if event.property_group else None,
+            "amount": event.amount,
+            "dice": event.dice,
+            "reason": event.reason,
+            "timestamp": Date.now().isoformat(),
+            "is_opponent": event.player != self,
+            # Additional modal-specific data
+            "modal_data": self._extract_modal_data(event)
+        }
+        
+        # Store the event persistently with thread safety
+        with self.event_store_lock:
+            self.last_event_id += 1
+            ui_event["id"] = self.last_event_id
+            self.event_store.append(ui_event)
+            
+            if len(self.event_store) > 1000:
+                # Remove oldest events but keep their IDs in acknowledged set
+                removed_events = self.event_store[:100]
+                for removed_event in removed_events:
+                    self.acknowledged_events.add(removed_event['id'])
+                self.event_store = self.event_store[100:]
+
+
+    def _extract_modal_data(self, event):
+        """Extract additional data needed for specific modal types."""
+        modal_data = {}
+        
+        if event.type.name == "DICE_ROLLED":
+            modal_data.update({
+                "dice_values": event.dice,
+                "total": sum(event.dice) if event.dice else 0,
+                "is_doubles": event.dice[0] == event.dice[1] if event.dice else False
+            })
+        
+        elif event.type.name == "PROPERTY_PURCHASED":
+            if self.game_state and event.tile:
+                modal_data.update({
+                    "property_name": str(event.tile),
+                    "property_price": getattr(event.tile, 'price', 0),
+                    "player_balance_after": self.game_state.player_balances.get(event.player, 0),
+                    "player_name": str(event.player) 
+                })
+        
+        elif event.type.name == "PROPERTY_TRADED":
+            if self.game_state and event.tile:
+                modal_data.update({
+                    "property_name": str(event.tile),
+                    "from_player": str(event.target_player) if event.target_player else "Unknown",
+                    "to_player": str(event.player),
+                    "trade_details": getattr(event, 'additional_data', {}).get('trade_details', {})
+                })
+        
+        elif event.type.name == "RENT_PAID":
+            modal_data.update({
+                "property_name": str(event.tile) if event.tile else "Unknown Property",
+                "rent_amount": event.amount,
+                "landlord": str(event.target_player) if event.target_player else "Unknown",
+                "tenant": str(event.player)
+            })
+        
+        elif event.type.name == "PLAYER_MOVED":
+            if hasattr(event, 'additional_data') and event.additional_data:
+                position = event.additional_data.get("position")
+                tile_name = str(event.tile) if event.tile else f"Position {position}"
+                modal_data.update({
+                    "new_position": position,
+                    "tile_name": tile_name,
+                    "dice_roll": event.additional_data.get("dice_roll"),
+                    "movement_reason": event.additional_data.get("movement_reason", "dice_roll")
+                })
+            else:
+                modal_data.update({
+                    "tile_name": str(event.tile) if event.tile else "Unknown Location",
+                    "movement_reason": "card_effect"
+                })
+        
+        elif event.type.name in ["CHANCE_CARD_DRAWN", "COMMUNITY_CHEST_CARD_DRAWN"]:
+            modal_data.update({
+                "card_type": "Chance" if "CHANCE" in event.type.name else "Community Chest",
+                "card_description": event.description
+            })
+        
+        elif event.type.name == "PLAYER_BANKRUPT":
+            modal_data.update({
+                "final_balance": event.amount if event.amount else 0,
+                "player_name": str(event.player)
+            })
+        
+        elif event.type.name in ["TRADE_OFFERED", "TRADE_ACCEPTED", "TRADE_EXECUTED"]:
+            trade_data = getattr(event, 'additional_data', {}).get('trade_offer', {})
+            modal_data.update({
+                "trade_details": {
+                    "source_player": str(event.player),
+                    "target_player": str(event.target_player) if event.target_player else "Unknown",
+                    "properties_offered": trade_data.properties_offered if isinstance(trade_data, TradeOffer) else [],
+                    "money_offered": trade_data.money_offered if isinstance(trade_data, TradeOffer) else 0,
+                    "jail_cards_offered": trade_data.jail_cards_offered if isinstance(trade_data, TradeOffer) else 0,
+                    "properties_requested": trade_data.properties_requested if isinstance(trade_data, TradeOffer) else [],
+                    "money_requested": trade_data.money_requested if isinstance(trade_data, TradeOffer) else 0,
+                    "jail_cards_requested": trade_data.jail_cards_requested if isinstance(trade_data, TradeOffer) else 0
+                }
+            })
+        
+        return modal_data
     
 
     def set_game_ended(self, winner=None, bankrupt_players=None, turn_count=0, is_draw=False, max_turns_reached=False, error=None):
@@ -245,13 +410,10 @@ class HumanAgent(Player):
             player_name = player.name
             
             try:
-                # Count monopolies
                 monopolies = self._count_player_monopolies(player)
                 
-                # Count buildings
                 houses, hotels = self._count_player_buildings(player)
                 
-                # Count mortgaged properties
                 player_properties = self.game_state.properties.get(player, [])
                 mortgaged = sum(1 for prop in player_properties 
                                if prop in self.game_state.mortgaged_properties)
@@ -269,7 +431,6 @@ class HumanAgent(Player):
                 }
             except Exception as e:
                 ErrorLogger.log_error(e)
-                # Fallback stats if calculation fails
                 stats[player_name] = {
                     "final_cash": self.game_state.player_balances.get(player, 0),
                     "final_net_worth": self.game_state.player_balances.get(player, 0),
@@ -719,44 +880,3 @@ class HumanAgent(Player):
         except Exception as e:
             ErrorLogger.log_error(e)
             return None
-        
-
-    def on_event_received(self, event):
-        """
-        Process game events and forward them to the UI for display.
-        
-        Converts game events into a UI-friendly format and queues them
-        for consumption by the frontend. Events are timestamped and
-        marked with opponent flags for proper display.
-        
-        Parameters
-        ----------
-        event : Event
-            The game event to process and display
-        """
-
-        # Call the parent implementation to log and store in history
-        super().on_event_received(event)
-        
-        # Convert event to a UI-friendly format, regardless of which player triggered it
-        ui_event = {
-            "type": event.type.name,
-            "description": event.description,
-            "player": str(event.player),
-            "target_player": str(event.target_player) if event.target_player else None,
-            "tile": str(event.tile) if event.tile else None,
-            "amount": event.amount,
-            "timestamp": Date.now().isoformat(),  # Add a timestamp for sorting in ISO format
-            "is_opponent": event.player != self  # Flag to indicate if it's an opponent's event
-        }
-        
-        # Queue the event to be sent to the UI
-        try:
-            self.ui_event_queue.put_nowait(ui_event)
-        except queue.Full:
-            # Queue is full, remove oldest event and add new one
-            try:
-                self.ui_event_queue.get_nowait()
-                self.ui_event_queue.put_nowait(ui_event)
-            except:
-                pass

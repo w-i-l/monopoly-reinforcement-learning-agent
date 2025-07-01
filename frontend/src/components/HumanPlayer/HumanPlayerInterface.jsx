@@ -12,17 +12,21 @@ import DecisionUI from "../Cards/DecisionCard";
 import PendingDecisionCard from "../Cards/PendingDecisionCard";
 import GameErrorModal from "../Modals/GameErrorModal";
 import GameVictoryModal from "../Modals/GameVictoryModal";
+import { EventModalManager } from "../Modals/EventModalManager";
 
 const HumanPlayerInterface = ({ playerPort = 6060 }) => {
   const [pendingDecision, setPendingDecision] = useState(null);
   const [error, setError] = useState(null);
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [showEventFeed, setShowEventFeed] = useState(true);
-  const [selectedEventType, setSelectedEventType] = useState("All");
+  const [selectedEventType, setSelectedEventType] = useState("all");
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [showAcceptTradeModal, setShowAcceptTradeModal] = useState(false);
   const [isNetworkLoading, setIsNetworkLoading] = useState(false);
   const [gameResult, setGameResult] = useState(null);
+
+  const [eventModalsActive, setEventModalsActive] = useState(false);
+  const [modalBlocking, setModalBlocking] = useState(false);
 
   const {
     gameState,
@@ -35,6 +39,44 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
     refreshGameState,
   } = useGameState();
 
+  const resetModalState = () => {
+    setEventModalsActive(false);
+    setModalBlocking(false);
+  };
+
+  useEffect(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  }, []);
+
+  // Handle page visibility change to reset modal state if needed
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && modalBlocking) {
+        // Reset modal state when page becomes visible again
+        setTimeout(resetModalState, 1000);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [modalBlocking]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      // Press Ctrl+Shift+R to reset modal state
+      if (event.ctrlKey && event.shiftKey && event.key === "R") {
+        console.log("Emergency modal reset triggered");
+        resetModalState();
+        event.preventDefault();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Check if the game has ended
   useEffect(() => {
     const checkGameEnd = async () => {
@@ -44,26 +86,23 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
         );
         if (response.ok) {
           const result = await response.json();
-          console.log("Game result check:", result); // Debug log
+          console.log("Game result check:", result);
 
           if (result.game_ended) {
             setGameResult(result);
+            // Reset modal state if game ended
+            resetModalState();
           }
         } else {
           console.log("Game result response not ok:", response.status);
         }
       } catch (err) {
-        // Game result endpoint not available or game still ongoing
         console.log("Game result check error:", err.message);
       }
     };
 
-    // Only check for game end if we have a valid game state
     if (gameState && !gameError && !isLoading) {
-      // Check immediately
       checkGameEnd();
-
-      // Then check every 2 seconds
       const interval = setInterval(checkGameEnd, 2000);
       return () => clearInterval(interval);
     }
@@ -75,10 +114,19 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
       gameError,
       isLoading,
       gameState: !!gameState,
+      eventModalsActive,
+      modalBlocking,
     });
-  }, [gameResult, gameError, isLoading, gameState]);
+  }, [
+    gameResult,
+    gameError,
+    isLoading,
+    gameState,
+    eventModalsActive,
+    modalBlocking,
+  ]);
 
-  // USE Effect to handle showing modal on accept trade
+  // Handle showing modal on accept trade
   useEffect(() => {
     if (pendingDecision && pendingDecision.type === "accept_trade") {
       setShowAcceptTradeModal(true);
@@ -102,7 +150,7 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
         const data = await response.json();
         if (data.type !== "none") {
           setPendingDecision(data);
-          setSelectedItems(new Set()); // Reset selections
+          setSelectedItems(new Set());
           localStorage.setItem("pendingDecision", JSON.stringify(data));
           setError(null);
         }
@@ -145,7 +193,6 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
 
   const isAIThinking = () => {
     if (!gameState || isLoading) return false;
-
     const currentPlayerName = gameState.players[gameState.currentPlayer].name;
     return !currentPlayerName.includes("Human");
   };
@@ -159,6 +206,22 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
       newSelection.add(item);
     }
     setSelectedItems(newSelection);
+  };
+
+  // Handle event modal state changes with improved logic
+  const handleEventModalChange = (isActive) => {
+    console.log("Modal state change:", isActive);
+    setEventModalsActive(isActive);
+    setModalBlocking(isActive);
+
+    // If modals become inactive, ensure DOM cleanup
+    if (!isActive) {
+      setTimeout(() => {
+        // Double-check that modals are really inactive
+        setEventModalsActive(false);
+        setModalBlocking(false);
+      }, 500);
+    }
   };
 
   // If there's a game result, show victory modal
@@ -194,13 +257,28 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
   }
 
   return (
-    <div className="w-full h-screen max-h-screen overflow-hidden flex">
+    <div className="w-full h-screen max-h-screen overflow-hidden flex relative">
+      {/* Event Modal Manager - NEW */}
+      <EventModalManager
+        playerPort={playerPort}
+        onModalChange={handleEventModalChange}
+      />
+
+      {/* Overlay to block interface when event modals are active - NEW */}
+      {modalBlocking && (
+        <div
+          className="absolute inset-0 z-40 bg-black/20 backdrop-blur-sm pointer-events-all flex items-center justify-center"
+          onClick={resetModalState} // Emergency click to reset
+        >
+          <div className="text-white bg-black/50 rounded-lg text-sm"></div>
+        </div>
+      )}
+
       {/* TRADING MODALS */}
       {showTradeModal && (
-        // Use the enhanced CreateTradeModal component
         <CreateTradeModal
           isOpen={showTradeModal}
-          onClose={() => setShowTradeModal(false)} // Just hide the modal without submitting
+          onClose={() => setShowTradeModal(false)}
           tradeData={pendingDecision.data}
           onSubmit={(trades) => {
             setShowTradeModal(false);
@@ -249,13 +327,20 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
             </div>
           </div>
         )}
+
+        {/* Event Modal Status Indicator */}
+        {eventModalsActive && (
+          <div className="absolute top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-30">
+            <div className="animate-pulse w-2 h-2 bg-white rounded-full"></div>
+            <span className="text-sm font-medium">Game Event</span>
+          </div>
+        )}
       </div>
 
       {/* Right column */}
       <div className="w-1/4 h-full flex flex-col">
         {/* Decision UI */}
-
-        <div className="p-4 flex-shrink-0">
+        <div className="p-3 flex-shrink-0">
           {pendingDecision ? (
             <DecisionUI
               pendingDecision={pendingDecision}
@@ -273,21 +358,18 @@ const HumanPlayerInterface = ({ playerPort = 6060 }) => {
               isAIThinking={isAIThinking}
               waitingForNetwork={isNetworkLoading}
               gameState={gameState}
+              eventModalsActive={eventModalsActive} // NEW: Pass modal state
             />
           )}
         </div>
-
-        {/* Event feed */}
-        {showEventFeed && (
-          <div className="flex-1 flex flex-col overflow-hidden px-3 pt-2">
-            <div className="flex-1 overflow-auto -mx-3 px-3">
-              <EventFeed
-                playerPort={playerPort}
-                filter={selectedEventType.toLowerCase()}
-              />
-            </div>
-          </div>
-        )}
+        {/* Spacer */}
+        <div
+          className="flex-1 flex flex-col px-3 pt-2 w-1/4"
+          style={{ color: "#242424", userSelect: "none" }}
+        >
+          11111111111111111111111111111111111111111111111111111111111111111111111111111
+          111111111111111111111111111111111111111111111111
+        </div>
       </div>
     </div>
   );
