@@ -1,0 +1,1 @@
+{"state_dim": 100, "hidden_dims": [128, 64, 32], "learning_rate": 0.001, "gamma": 0.99, "epsilon": 0.1176382719218926, "epsilon_end": 0.1, "epsilon_decay": 0.998, "target_update_freq": 10, "batch_size": 64, "action_dims": {"buy_property": 2, "get_upgrading_suggestions": 8, "should_pay_get_out_of_jail_fine": 2}}

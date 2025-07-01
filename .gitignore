@@ -164,7 +164,8 @@ dist-ssr
 
 # tournaments results
 tournament_results/
-saved_models/
 trained_models/
 training_logs/
 default_strategic_agents_search/
+*/saved_models/*/training_stats_final.json
+*/saved_models/*/training_stats_final.png
