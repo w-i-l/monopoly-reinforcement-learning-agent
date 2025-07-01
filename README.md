@@ -110,56 +110,42 @@ python main.py
 <h3>Hybrid DQN Architecture</h3>
 
 ```mermaid 
+---
+config:
+  theme: neutral
+---
 graph TD
-    %% Input
     GS[Game State] --> SE[State Encoder<br/>100 features]
-    
-    %% Core Innovation: Multiple Specialized Networks
     SE --> MN[Multiple Specialized Networks]
-    
     subgraph "Specialized Q-Networks"
         MN --> BP[Buy Property<br/>Network]
         MN --> UP[Property Upgrade<br/>Network]
         MN --> FN[Financial Management<br/>Network]
         MN --> JL[Jail Decision<br/>Network]
     end
-    
-    %% Hybrid Decision Making
     BP --> HD{Hybrid Decision<br/>Layer}
     UP --> HD
     FN --> HD
     JL --> HD
-    
-    %% Strategic Fallback
     SA[Strategic Agent<br/>Fallback] --> HD
-    
-    %% Training System
     subgraph "Training Pipeline"
         EL[Expert Learning<br/>Pre-training] --> RL[Reinforcement Learning<br/>Self-play]
         RL --> ER[Experience Replay<br/>Separate buffers]
         ER --> TN[Target Networks<br/>Stable learning]
     end
-    
-    %% Final Output
     HD --> AC[Action]
-    
-    %% Connect training to networks
     EL -.-> BP
     EL -.-> UP
     EL -.-> FN
     EL -.-> JL
-    
     RL -.-> BP
     RL -.-> UP
     RL -.-> FN
     RL -.-> JL
-    
-    %% Styling
-    classDef coreNode fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
-    classDef networkNode fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef trainingNode fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
-    classDef hybridNode fill:#fff3e0,stroke:#f57c00,stroke-width:3px
-    
+    classDef coreNode fill:#e3f2fd,stroke:#1976d2,stroke-width:3px,color:#000000
+    classDef networkNode fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000000
+    classDef trainingNode fill:#e8f5e8,stroke:#388e3c,stroke-width:2px,color:#000000
+    classDef hybridNode fill:#fff3e0,stroke:#f57c00,stroke-width:3px,color:#000000
     class SE,MN coreNode
     class BP,UP,FN,JL networkNode
     class EL,RL,ER,TN trainingNode
