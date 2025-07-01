@@ -1,0 +1,55 @@
+\chapter{Introducere}
+
+\section{Tipul lucrării}
+
+Această lucrare se încadrează în tema inteligenței artificiale, fiind o aplicație practică a paradigmei de învățare automată, denumită învățare prin întărire sau \textit{reinforcement learning}. Această tehnică presupune evidențierea unui agent într-un spațiu de decizii care învață să coreleze eficient o acțiune întreprinsă într-o anumită stare astfel încât să maximizeze recompensa obținută în vederea atingerii unui scop clar predefinit. Reinforcement learning-ul este cea mai intuitivă abordare în vederea construirii unui agent inteligent într-un mediu necunoscut, ea inspirându-se din modelul uman de învățare.
+
+\section{Prezentarea generală a temei}
+
+Teza curentă are ca obiectiv construirea unui agent inteligent bazat pe metodologia enunțată anterior ce își propune aflarea unei politici optime de interacțiune cu jocul Monopoly, maximizând averea jucătorului, astfel îmbunătățind șansa sa de câștig.
+
+Principala provocare o reprezintă dimensionalitatea spațiului din joc, indecidabilitatea afirmării unei acțiuni optime, dat fiind o stare curentă cu planificarea recompensei atât în viitorul apropiat, cât și cu consecințe viitoare, dar și stocacitatea environment-ului, cauzată de aruncarea zarurilor și a elementelor impredictibile precum extragerea cărților din pachetul „Cufărul Comunității" sau a celui „Șansa".
+
+\section{Motivația}
+
+În ultimii ani, avansarea tehnologică a condus la o îmbunătățire în utilizarea și cercetarea domeniului inteligenței artificiale, începând de la învățarea supervizată în vederea automată (computer vision) din 2012 \cite{alexnet}, a inovării din domeniul procesării limbajului natural prin introducerea de roboți conversaționali (chat bots), moment reprezentat de ChatGPT \cite{chatgpt}, dar și a procesării sunetului, permițând generarea cântecelor pornind de la un prompt \cite{sunoai}.
+
+Domeniul învățării prin întărire a văzut de asemenea rezultate uimitoare, mai ales pe partea jocurilor precum Atari \cite{atari}, pong sau donkey-kong. O analiză mai amplă asupra evoluției curente și a statusului introducerii reinforcement learning în jocurile video \cite{rl_in_video_games} arată că tot mai multe jocuri video publicate adoptă comportament inteligent, astfel reușind să captiveze și mai mulți jucătorii.
+
+Văzând acest progres mi-am dorit să îmi pot construi propria implementare de agent într-un environment ales personal, de aceea alegerea jocului trebuia făcută pe baza unor criterii obiective precum:
+\begin{itemize}
+    \item spațiul și acțiunile jocului trebuiau să poată fi încorporate (embedded) într-un vector unidimensional cu dimensiune relativ decentă
+    \item modelarea ordinii desfășurării acțiunilor să poată fi redată cu o mașină de stări cu un număr acceptabil de stări și tranziții
+    \item jocul să nu includă componente continue, ci doar acțiuni/stări ce pot fi discretizate, fără a se pierde precizia
+    \item proiectarea environment-ului și rularea simulărilor să nu fie costisitoare din punct de vedere al cerințelor computaționale
+    \item simularea unui episod de joc să poată fi restrânsă la un număr dorit de pași fără a afecta considerabil rezultatul jocului.
+\end{itemize}
+
+Astfel un prim joc analizat a fost Monopoly, un joc de masă cu teme economice și sociale care își propune să simuleze un sistem capitalist și să reflecte problemele bazate pe monopoluri în piața imobiliară \cite{wikipedia_monopoly}. Acesta respectă atât cerințele impuse anterior, cât și posedă un sistem de reguli ce pot fi ușor adaptate și chiar schimbate pentru o modelare mai fidelă într-un sistem digital. Mai mult, Monopoly este un joc interactiv cu o mare posibilitate de creativitate pe partea strategiilor abordate, lucru ce va influența pozitiv posibilitățile de explorare și decizie ale agentului inteligent.
+
+\section{Contribuția personală}
+Contribuția personală se poate rezuma la:
+\begin{enumerate}
+    \item crearea și reproducerea fidelă a unui environment pentru Monopoly
+    \item implementarea unei noi arhitecturi de agent hibrid, utilizând multiple rețele neuronale și algoritmi pentru decizie
+    \item încapsularea fidelă a unei stări din Monopoly, păstrând toată informația în encodare
+    \item abordarea unui sistem de învățare cu expert, pentru o mai bună convergență
+    \item definirea unor funcții de recompensă specifice fiecărei acțiuni pentru facilitarea traiectoriei optime de învățare
+\end{enumerate}
+
+\section{Structura lucrării}
+Lucrarea este împărțită în 3 capitole definitorii:
+\begin{itemize}
+    \item \textbf{Modelarea jocului:} - definirea regulilor, a stărilor și acțiunilor posibile
+    \item \textbf{Agenții algoritmici:} - proiectarea oponenților și prezentarea particularităților lor
+    \item \textbf{Agentul DQN:} - descrierea implementării jucătorului inteligent
+\end{itemize}
+
+\subsection{Modelarea jocului}
+Această secțiune definește sistemul complet de reguli al jocului Monopoly, incluzând toate stările posibile ale jocului și spațiul complet de acțiuni disponibile jucătorilor. Se detaliază modul în care mecanicile complexe ale jocului de masă sunt traduse într-un cadru computațional potrivit pentru învățarea prin întărire, asigurând reproducerea fidelă a dinamicii jocului original.
+
+\subsection{Agenții algoritmici}
+Acest capitol prezintă proiectarea și implementarea agenților oponent cu strategii algoritmice fixe care servesc ca linii de bază și parteneri de antrenament. Se descriu caracteristicile specifice și modelele de luare a deciziilor pentru fiecare agent algoritmic, explicând cum aceștia oferă stiluri diverse de joc împotriva cărora agentul inteligent poate învăța.
+
+\subsection{Agentul DQN}
+Acest capitol descrie implementarea jucătorului inteligent folosind metodologia Deep Q-Network, detaliind abordarea hibridă de învățare și arhitectura cu multiple rețele. Se explică faza de învățare cu experți, proiectarea funcției de recompensă și modul în care agentul dezvoltă progresiv strategii optime prin interacțiunea cu mediul.

@@ -1,0 +1,61 @@
+\chapter{Funcții de Recompensă pentru Agentul DQN}
+\label{annex:reward_functions}
+
+Această anexă prezintă formularea matematică a funcțiilor de recompensă utilizate în antrenarea agentului DQN.
+
+\subparagraph{Recompensa de bază} Toate funcțiile de recompensă pornesc de la schimbarea normalizată a averii nete:
+\begin{equation}
+\Delta W_{norm} = \text{clip}\left(\frac{W_{t+1} - W_t}{200}, -1, 1\right)
+\end{equation}
+unde $W_t$ este averea la momentul $t$
+
+\subparagraph{Cumpărarea proprietăților} Include bonus pentru completarea monopolurilor:
+\begin{equation}
+R_{buy} = \Delta W_{norm} + 0.3 \cdot I_{monopol}
+\end{equation}
+unde $I_{monopol} = 1$ dacă s-a completat un monopol nou, altfel 0.
+
+\subparagraph{Îmbunătățirea proprietăților.} Combină progresul cu gestionarea lichidității:
+\begin{equation}
+R_{upgrade} = 1.5 \cdot \Delta W_{norm} + 0.15 \cdot \Delta H + 0.3 \cdot \Delta O + R_{lichiditate}
+\end{equation}
+unde $\Delta H$, $\Delta O$ sunt schimbările în case și hoteluri, iar $R_{lichiditate} = -0.2$ dacă raportul de lichiditate $L_t = C_t/W_t < 0.1$, cu $C_t$ fiind balanța de cash la momentul $t$.
+
+\subparagraph{Vânzarea caselor/hotelurilor} Pune accent pe gestionarea cash-ului de urgență:
+\begin{equation}
+R_{downgrade} = 0.8 \cdot \Delta W_{norm} + R_{emergency} + R_{cash} - \sum_{g} \alpha_g
+\end{equation}
+unde $R_{emergency} \in \{0.3, 0.15, -0.1\}$ în funcție de cash-ul disponibil, $R_{cash} = \min(\Delta C/500, 0.2)$ și $\alpha_g = 0.1$ cu $g$ grup din cele valoroase.
+
+\subparagraph{Plata amenzii de închisoare} Echilibrează mobilitatea cu conservarea cash-ului:
+\begin{equation}
+R_{jail} = \Delta W_{norm} + R_{payment} + R_{profit} + R_{danger}
+\end{equation}
+unde $R_{payment} \in \{-0.1, 0.1, 0.15\}$ în funcție de decizie și cash, $R_{profit} = 0.2$ pentru acțiuni profitabile, iar $R_{danger}$ consideră pericolul tablei calculat ca $D = \sum_{k=2}^{12} P(k) \cdot \min(\text{chirie}_k/C_t, 1)$, măsurând riscul de plată al unei chirii la următoarea mișcare.
+
+\subparagraph{Folosirea cardului de ieșire} Consideră conservarea cardurilor:
+\begin{equation}
+R_{escape} = \Delta W_{norm} + R_{card} + R_{smart}
+\end{equation}
+unde $R_{card} \in \{-0.05, 0.05, 0.15\}$ în funcție de numărul de carduri și profitul cumulat în urma unei acțiuni succesive ieșitului din închisoare, iar $R_{smart} = 0.2$ pentru utilizare când $C_t < 300$.
+
+\subparagraph{Dezipotecarea proprietăților} Se concentrează pe restaurarea veniturilor:
+\begin{equation}
+R_{unmortgage} = 1.1 \cdot \Delta W_{norm} + R_{restore} + R_{value} + 0.25 \cdot N_{monopol} + R_{income}
+\end{equation}
+unde $R_{restore} \in \{-0.1, 0.1, 0.2, 0.3\}$ în funcție de cash, $R_{value}$ acordă bonusuri pentru proprietăți valoroase ($0.12$ Portocaliu/Roșu, $0.1$ Verde/Albastru), iar $R_{income} = \min(\sum I_p / 50, 0.2)$.
+
+\subparagraph{Stări terminale} Pentru sfârșitul jocului:
+\begin{equation}
+R_{terminal} = \begin{cases}
+1.0 & \text{câștig} \\
+-1.0 & \text{faliment} \\
+R_{method} & \text{altfel}
+\end{cases}
+\end{equation}
+
+\subparagraph{Valoarea proprietăților} Calculul agentului strategic:
+\begin{equation}
+V_{property} = (P + 10 \cdot \text{rent}) \cdot M_{completion} \cdot M_{location}
+\end{equation}
+unde $M_{completion} = 1.4$ pentru monopol complet sau $1.0 + 0.4 \cdot N_{owned}/N_{total}$ parțial, iar $M_{location} = 1.2$ (Portocaliu/Roșu), $1.1$ (Verde/Albastru) sau $1.0$.

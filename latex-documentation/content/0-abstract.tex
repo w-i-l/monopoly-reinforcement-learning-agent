@@ -1,0 +1,33 @@
+\begin{abstractpage}
+\vspace*{\fill}
+\begin{abstract}{romanian}
+
+Datorită avansării și progresului tehnologic, procesarea și resursele computaționale au facilitat avântul în direcția dezvoltării capacităților inteligenței artificiale. Astfel o arie ce a început să se remarce în ultimii ani prin explorarea și dezvoltarea noilor posibilități este învățarea prin întărire (reinforcement learning). Aceasta presupune antrenarea unui agent inteligent ce are ca scop navigarea printr-un spațiu (environment) și interacțiunea cu acesta într-o formă ce maximizează un scop predefinit.
+
+Jocul Monopoly este un candidat perfect pentru ilustrarea și modelarea unui agent care să descopere o strategie proprie și să creeze o politică de interacționare inteligentă. Datorită gradului de complexitate ridicată, favorizată de spațiul mare de acțiuni și stări posibile, al impredictibilității datorate aruncării zarurilor și extragerii cartonașelor „Cufărul comunității" și „Șansa", dar și al strategiilor de abordare a jocului nelimitate, construirea unui model al jocului care să funcționeze optim este o provocare care nu poate fi depășită ușor decât printr-o abordare dinamică.
+
+Dat fiind gradul ridicat de complexitate și componenta aleatorie, pentru facilitarea învățării și deprinderea unei bune cunoașteri a mediului, dar și generarea unei politici optime, vom folosi o abordare hibridă ce presupune derivarea agentului inteligent dintr-un agent cu o strategie algoritmică și fixă. Implementarea hibridă va asigura că vom putea folosi metodele părintelui în cazul acțiunilor cu un spațiu mare de posibilități ce ar fi îngreunat atât modelarea mediului cât și învățarea unei strategii bune, iar pe cele deprinse prin explorarea environment-ului le vom folosi pentru cele ce au putut fi modelate cu ușurință.
+
+Implementarea agentului de reinforcement learning se va face folosind o rețea adâncă de tipul Q (Deep Q-network, DQN), utilizând o paradigmă hibridă de învățare. Prima dată rețeaua va fi antrenată într-o manieră supervizată, folosind mai mulți agenți experți (expert learning), iar mai apoi aceasta își va continua antrenamentul interacționând cu mediul direct. O nouă îmbunătățire adusă arhitecturii este folosirea mai multor rețele pentru fiecare acțiune întreprinsă, lucru ce favorizează focalizarea, ajutând la particularizarea politicii optime.
+
+Rezultatele obținute arată că prin această arhitectură și abordare agentul inteligent reușește să depășească agentul părinte cu politica statică, atingând o rată de victorie de 90\% împotriva sa și depășindu-l pe acesta cu 5,3 procente într-un turneu cu 12 agenți, într-o formă round-robin.
+\end{abstract}
+\vspace*{\fill}
+
+\newpage
+
+\vspace*{\fill}
+\begin{abstract}{english}
+
+Due to technological advancement and progress, processing power and computational resources have facilitated the leap toward developing artificial intelligence capabilities. Thus, an area that has begun to stand out in recent years through the exploration and development of new possibilities is reinforcement learning. This involves training an intelligent agent whose goal is to navigate through a space (environment) and interact with it in a way that maximizes a predefined objective.
+
+The Monopoly game is a perfect candidate for illustrating and modeling an agent that discovers its own strategy and creates an intelligent interaction policy. Due to the high degree of complexity, favored by the large space of possible actions and states, the unpredictability caused by dice rolling and drawing "Community Chest" and "Chance" cards, as well as the unlimited game approach strategies, building an optimally functioning game model is a challenge that cannot be easily overcome except through a dynamic approach.
+
+Given the high degree of complexity and random component, to facilitate learning and acquiring good knowledge of the environment, as well as generating an optimal policy, we will use a hybrid approach that involves deriving the intelligent agent from an agent with an algorithmic and fixed strategy. The hybrid implementation will ensure that we can use the parent's methods for actions with a large space of possibilities that would hinder both environment modeling and learning a good strategy, while we will use those learned through environment exploration for those that could be easily modeled.
+
+The reinforcement learning agent implementation will be done using a deep Q-network (DQN), utilizing a hybrid learning paradigm. First, the network will be trained in a supervised manner, using multiple expert agents (expert learning), and then it will continue its training by interacting directly with the environment. A new improvement brought to the architecture is the use of multiple networks for each action undertaken, which favors focus, helping to particularize the optimal policy.
+
+The obtained results show that through this architecture and approach, the intelligent agent manages to surpass the parent agent with static policy, achieving a victory rate of 90\% against it and exceeding it by 5.3 percentage points in a tournament with 12 agents, in a round-robin format.
+\end{abstract}
+\vspace*{\fill}
+\end{abstractpage}
