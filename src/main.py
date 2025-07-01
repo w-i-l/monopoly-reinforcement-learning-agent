@@ -37,13 +37,12 @@ def play_against_human_agent(player):
             try:
                 turn_count += 1
                 can_continue = game_manager.play_turn()
-
-                if turn_count == 5:
-                    raise BankrupcyException(expert_dqn_agent.name)
                 
             except BankrupcyException as e:
                 print(f"Game ended due to bankruptcy: {e}")
                 
+                traceback.print_exc()
+
                 bankrupt_player_name = e.player_name
                 winner = None
                 for p in players:
@@ -61,6 +60,8 @@ def play_against_human_agent(player):
 
             except Exception as e:
                 print(f"Game ended due to error: {e}")
+
+                traceback.print_exc()
                 
                 # Try to determine winner by net worth
                 try:

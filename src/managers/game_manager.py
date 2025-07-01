@@ -305,7 +305,7 @@ class GameManager:
                         EventType.AUCTION_STARTED,
                         player=current_player,
                         tile=current_tile,
-                        description=f"{current_player} chose not to purchase {current_tile}, starting auction"
+                        description=f"{current_player} chose not to purchase {current_tile}"
                     )
                     # Placeholder for auction implementation
                     pass
