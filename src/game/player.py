@@ -259,7 +259,7 @@ class Player(ABC):
         -------
         BankruptcyRequest
         """
-        pass
+        return BankruptcyRequest()
     
 
     def on_event_received(self, event):
