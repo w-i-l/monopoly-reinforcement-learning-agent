@@ -363,6 +363,53 @@ const MortgagePropertiesDecision = ({
   );
 };
 
+const UnmortgagePropertiesDecision = ({
+  pendingDecision,
+  handleDecision,
+  selectedItems,
+  toggleSelection,
+}) => {
+  return (
+    <DecisionCard
+      title="Unmortgage Properties"
+      onSkip={() => handleDecision([])}
+      actions={
+        <Button
+          variant="primary"
+          onClick={() => handleDecision(Array.from(selectedItems))}
+          disabled={selectedItems.size === 0}
+          className="w-full"
+        >
+          Confirm Selected Unmortgages ({selectedItems.size})
+        </Button>
+      }
+    >
+      <InfoItem
+        label="Your Balance"
+        value={`${pendingDecision.data.balance}₩`}
+      />
+      <h4 className="font-medium text-gray-700 my-3">
+        Select properties to unmortgage:
+      </h4>
+      <div className="divide-y divide-gray-200 max-h-72 overflow-y-auto pr-2">
+        {pendingDecision.data.properties.map((prop) => {
+          const isSelected = selectedItems.has(prop);
+          return (
+            <SelectableButton
+              key={prop}
+              item={prop}
+              onClick={() => toggleSelection(prop)}
+              selected={isSelected}
+            >
+              Unmortgage {prop}
+            </SelectableButton>
+          );
+        })}
+      </div>
+    </DecisionCard>
+  );
+};
+
 // 4. Pay Jail Fine Decision
 const PayJailFineDecision = ({ pendingDecision, handleDecision }) => {
   const { balance, jail_fine } = pendingDecision.data;
@@ -581,6 +628,15 @@ const DecisionUI = ({
 
     mortgage_properties: () => (
       <MortgagePropertiesDecision
+        pendingDecision={pendingDecision}
+        handleDecision={handleDecision}
+        selectedItems={selectedItems}
+        toggleSelection={toggleSelection}
+      />
+    ),
+
+    unmortgage_properties: () => (
+      <UnmortgagePropertiesDecision
         pendingDecision={pendingDecision}
         handleDecision={handleDecision}
         selectedItems={selectedItems}
