@@ -68,4 +68,4 @@ class Railway(Tile):
 
 
     def __repr__(self):
-        return f"{self.name} (Railway)"
+        return f"{self.name}"

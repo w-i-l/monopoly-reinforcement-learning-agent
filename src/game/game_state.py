@@ -1008,3 +1008,117 @@ class GameState:
         print("Current player index: ", self.current_player_index)
         print("Turn in jail: ", self.turns_in_jail)
         print("\n##########################################\n\n")
+
+
+    def json_representation(self) -> dict:
+        """
+        Get a JSON-serializable representation of the game state.
+        
+        Returns
+        -------
+        dict
+            Dictionary representation of the game state
+        """
+        return {
+            "player_positions": {str(player): pos for player, pos in self.player_positions.items()},
+            "player_balances": {str(player): balance for player, balance in self.player_balances.items()},
+            "properties": {str(player): [str(prop) for prop in props] for player, props in self.properties.items()},
+            "houses": {str(group): (count, str(owner)) for group, (count, owner) in self.houses.items()},
+            "hotels": {str(group): (count, str(owner)) for group, (count, owner) in self.hotels.items()},
+            "in_jail": {str(player): in_jail for player, in_jail in self.in_jail.items()},
+            "escape_jail_cards": {str(player): cards for player, cards in self.escape_jail_cards.items()},
+            "mortgaged_properties": [str(prop) for prop in self.mortgaged_properties],
+            "is_owned": [str(prop) for prop in self.is_owned],
+            "doubles_rolled": self.doubles_rolled,
+            "current_player_index": self.current_player_index,
+            "turns_in_jail": {str(player): turns for player, turns in self.turns_in_jail.items()}
+        }
+    
+
+    @staticmethod
+    def from_json(json_data: dict, players: list[Player]) -> 'GameState':
+        """
+        Create a GameState instance from a JSON-serializable dictionary.
+        
+        Parameters
+        ----------
+        json_data : dict
+            JSON data to load from
+        
+        Returns
+        -------
+        GameState
+            New GameState instance populated with data from json_data
+        """
+
+        if "game_state" in json_data:
+            json_data = json_data['game_state']
+        else:
+            raise ValueError("Invalid JSON data: 'game_state' key not found")
+
+        game_state = GameState(players=players)
+
+        def get_player_by_name(name):
+            if name == "None":
+                return None
+            
+            return next(player for player in players if str(player) == name)
+
+        player_positions = {
+            player: json_data['player_positions'][str(player)]
+            for player in players
+        }
+        game_state.player_positions = player_positions
+
+        player_balances = {
+            player: json_data['player_balances'][str(player)]
+            for player in players
+        }
+        game_state.player_balances = player_balances
+
+        properties = {
+            player: [game_state.board.get_tile_by_name(prop) for prop in json_data['properties'][str(player)]]
+            for player in players
+        }
+        game_state.properties = properties
+
+        game_state.houses = {
+            PropertyGroup.init_from(group): (count, get_player_by_name(owner))
+            for group, (count, owner) in json_data['houses'].items()
+        }
+
+        game_state.hotels = {
+            PropertyGroup.init_from(group): (count, get_player_by_name(owner))
+            for group, (count, owner) in json_data['hotels'].items()
+        }
+
+        game_state.in_jail = {
+            get_player_by_name(player): in_jail
+            for player, in_jail in json_data['in_jail'].items()
+        }
+
+
+        game_state.escape_jail_cards = {
+            get_player_by_name(player): cards
+            for player, cards in json_data['escape_jail_cards'].items()
+        }
+
+        game_state.mortgaged_properties = {
+            game_state.board.get_tile_by_name(prop)
+            for prop in json_data['mortgaged_properties']
+        }
+
+        game_state.is_owned = {
+            game_state.board.get_tile_by_name(prop)
+            for prop in json_data['is_owned']
+        }
+
+        game_state.doubles_rolled = json_data['doubles_rolled']
+        game_state.current_player_index = json_data['current_player_index']
+
+        game_state.turns_in_jail = {
+            get_player_by_name(player): turns
+            for player, turns in json_data['turns_in_jail'].items()
+        }
+
+        return game_state

@@ -70,4 +70,4 @@ class Utility(Tile):
 
 
     def __repr__(self):
-        return f"{self.name} (Utility)"
+        return f"{self.name}"

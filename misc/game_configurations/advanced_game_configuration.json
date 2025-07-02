@@ -1,0 +1,152 @@
+{
+    "game_state": {
+        "player_positions": {
+            "DQN player": 38,
+            "Human Player": 12
+        },
+        "player_balances": {
+            "DQN player": 1200,
+            "Human Player": 1000
+        },
+        "properties": {
+            "DQN player": [
+                "Berceni",
+                "Titan",
+                "Colentina",
+                "Tei",
+                "B-dul Brasov",
+                "Drumul Taberei",
+                "Piata Unirii",
+                "Cotroceni",
+                "B-dul Eroilor",
+                "Uzina Electrica",
+                "Gara de Nord"
+            ],
+            "Human Player": [
+                "Rahova",
+                "Giulesti",
+                "Vitan",
+                "Pantelimon",
+                "B-dul Timisoara",
+                "B-dul Carol",
+                "B-dul Titulescu",
+                "B-dul 1 Mai",
+                "B-dul Magheru",
+                "B-dul Primaverii",
+                "Gara Progresul",
+                "Gara Obor"
+            ]
+        },
+        "houses": {
+            "brown": [
+                1,
+                "Human Player"
+            ],
+            "light_blue": [
+                0,
+                "None"
+            ],
+            "pink": [
+                0,
+                "None"
+            ],
+            "orange": [
+                0,
+                "None"
+            ],
+            "red": [
+                0,
+                "None"
+            ],
+            "yellow": [
+                0,
+                "None"
+            ],
+            "green": [
+                0,
+                "None"
+            ],
+            "blue": [
+                0,
+                "None"
+            ]
+        },
+        "hotels": {
+            "brown": [
+                0,
+                "None"
+            ],
+            "light_blue": [
+                0,
+                "None"
+            ],
+            "pink": [
+                0,
+                "None"
+            ],
+            "orange": [
+                0,
+                "None"
+            ],
+            "red": [
+                0,
+                "None"
+            ],
+            "yellow": [
+                0,
+                "None"
+            ],
+            "green": [
+                0,
+                "None"
+            ],
+            "blue": [
+                0,
+                "None"
+            ]
+        },
+        "in_jail": {
+            "DQN player": false,
+            "Human Player": false
+        },
+        "escape_jail_cards": {
+            "DQN player": 0,
+            "Human Player": 1
+        },
+        "mortgaged_properties": [],
+        "is_owned": [
+            "Drumul Taberei",
+            "B-dul 1 Mai",
+            "B-dul Titulescu",
+            "B-dul Eroilor",
+            "Cotroceni",
+            "Uzina Electrica",
+            "B-dul Primaverii",
+            "B-dul Magheru",
+            "Gara Progresul",
+            "Gara Obor",
+            "Gara de Nord",
+            "Pantelimon",
+            "Titan",
+            "Rahova",
+            "Giulesti",
+            "Colentina",
+            "B-dul Carol",
+            "Berceni",
+            "B-dul Brasov",
+            "B-dul Timisoara",
+            "Tei",
+            "Vitan",
+            "Piata Unirii"
+        ],
+        "doubles_rolled": 0,
+        "current_player_index": 1,
+        "turns_in_jail": {
+            "DQN player": 0,
+            "Human Player": 0
+        }
+    },
+    "scenario_name": "advanced_multi_decision_strategic_test",
+    "description": "Complex scenario testing DQN's advanced strategic reasoning across multiple dimensions",
+    "seed": "7379100"
+}

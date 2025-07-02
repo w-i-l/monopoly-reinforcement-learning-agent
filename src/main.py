@@ -4,6 +4,7 @@ import tensorflow as tf
 import traceback
 import time
 import os
+import json
 
 from managers.game_manager import GameManager
 from agents.human_agent import HumanAgent
@@ -18,13 +19,23 @@ def set_seed(seed):
     random.seed(seed)
     tf.random.set_seed(seed)
 
-# set_seed(7379100)
 
 def play_against_human_agent(player):
     human_player = HumanAgent("Human Player", port=6060)
     players = [player, human_player]
     game_manager = GameManager(players)
     game_manager.game_state.configure_debug_mode(can_print=False)
+
+    root_folder = "../misc/game_configurations"
+    advanced_game_configuration_path = f"{root_folder}/advanced_game_configuration.json"
+    endgame_game_configuration_path = f"{root_folder}/endgame_game_configuration.json"
+    json_data = json.load(open(advanced_game_configuration_path, "r"))
+    seed = json_data.get("seed", None)
+    if seed is not None:
+        if isinstance(seed, str):
+            seed = int(seed)
+        set_seed(seed)
+    game_manager.game_state = GameState.from_json(json_data, players=players)
 
     human_player.game_state = game_manager.game_state
 

@@ -1,0 +1,160 @@
+{
+    "game_state": {
+        "player_positions": {
+            "Human Player": 39,
+            "DQN player": 10
+        },
+        "player_balances": {
+            "Human Player": 2600,
+            "DQN player": 2500
+        },
+        "properties": {
+            "Human Player": [
+                "B-dul Timisoara",
+                "B-dul Brasov",
+                "Drumul Taberei",
+                "Piata Unirii",
+                "Cotroceni",
+                "Calea Victoriei",
+                "Berceni",
+                "B-dul Kogalniceanu",
+                "Uzina Electrica",
+                "Uzina de Apa"
+            ],
+            "DQN player": [
+                "Rahova",
+                "Giulesti",
+                "B-dul Titulescu",
+                "B-dul 1 Mai",
+                "Calea Dorobantilor",
+                "B-dul Magheru",
+                "B-dul Primaverii",
+                "Gara de Nord",
+                "Gara Basarab",
+                "Gara Obor",
+                "Gara Progresul",
+                "B-dul Carol",
+                "B-dul Eroilor",
+                "Titan",
+                "Colentina",
+                "Tei"
+            ]
+        },
+        "houses": {
+            "brown": [
+                2,
+                "DQN player"
+            ],
+            "light_blue": [
+                0,
+                "None"
+            ],
+            "pink": [
+                2,
+                "DQN player"
+            ],
+            "orange": [
+                2,
+                "Human Player"
+            ],
+            "red": [
+                0,
+                "None"
+            ],
+            "yellow": [
+                0,
+                "None"
+            ],
+            "green": [
+                3,
+                "Human Player"
+            ],
+            "blue": [
+                0,
+                "None"
+            ]
+        },
+        "hotels": {
+            "brown": [
+                0,
+                "None"
+            ],
+            "light_blue": [
+                0,
+                "None"
+            ],
+            "pink": [
+                0,
+                "None"
+            ],
+            "orange": [
+                0,
+                "None"
+            ],
+            "red": [
+                0,
+                "None"
+            ],
+            "yellow": [
+                0,
+                "None"
+            ],
+            "green": [
+                0,
+                "None"
+            ],
+            "blue": [
+                0,
+                "None"
+            ]
+        },
+        "in_jail": {
+            "Human Player": false,
+            "DQN player": true
+        },
+        "escape_jail_cards": {
+            "Human Player": 0,
+            "DQN player": 1
+        },
+        "mortgaged_properties": [
+            "Gara Progresul"
+        ],
+        "is_owned": [
+            "B-dul Magheru",
+            "B-dul Eroilor",
+            "Cotroceni",
+            "Calea Dorobantilor",
+            "B-dul Primaverii",
+            "Calea Victoriei",
+            "Uzina de Apa",
+            "Gara Progresul",
+            "Gara Obor",
+            "Gara Basarab",
+            "Gara de Nord",
+            "Uzina Electrica",
+            "B-dul Timisoara",
+            "Titan",
+            "Rahova",
+            "Giulesti",
+            "Colentina",
+            "B-dul Carol",
+            "Berceni",
+            "B-dul Brasov",
+            "B-dul Titulescu",
+            "Tei",
+            "B-dul Kogalniceanu",
+            "Piata Unirii",
+            "Drumul Taberei",
+            "B-dul 1 Mai"
+        ],
+        "doubles_rolled": 0,
+        "current_player_index": 1,
+        "turns_in_jail": {
+            "Human Player": 0,
+            "DQN player": 1
+        }
+    },
+    "scenario_name": "end_game_high_stakes_cash_management",
+    "description": "Late-game scenario with developed monopolies and cash flow pressure",
+    "seed": "8431292"
+}

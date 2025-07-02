@@ -720,7 +720,7 @@ class HumanAgent(Player):
 
             data = {
                 "grouped_properties": {
-                    str(group): ([str(p) for p in props], len(props) * group.house_cost() if game_state.houses[group][0] > 0 else len(props) * group.hotel_cost())
+                    str(group): ([str(p) for p in props], len(props) * group.house_cost() * 0.5 if game_state.houses[group][0] > 0 else len(props) * group.hotel_cost() * 0.5) 
                     for group, props in grouped_properties.items()
                 },
                 "balance": game_state.player_balances[self],
