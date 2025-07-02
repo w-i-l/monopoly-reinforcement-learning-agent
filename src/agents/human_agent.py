@@ -695,6 +695,42 @@ class HumanAgent(Player):
         except Exception as e:
             ErrorLogger.log_error(e)
             return []
+        
+
+    def get_downgrading_suggestions(self, game_state):
+        try:
+            properties = game_state.properties[self]
+            grouped_properties = {
+                property.group: [] for property in properties 
+                if isinstance(property, Property)
+            }
+            
+            for property in properties:
+                if isinstance(property, Property):
+                    grouped_properties[property.group].append(property)
+
+            grouped_properties_copy = deepcopy(grouped_properties)
+            for group in grouped_properties_copy:
+                if len(grouped_properties[group]) != len(game_state.board.get_properties_by_group(group)) or\
+                     (game_state.houses[group][0] == 0 and game_state.hotels[group][0] == 0):
+                    grouped_properties.pop(group)
+
+            if not grouped_properties:
+                return []
+
+            data = {
+                "grouped_properties": {
+                    str(group): ([str(p) for p in props], len(props) * group.house_cost() if game_state.houses[group][0] > 0 else len(props) * group.hotel_cost())
+                    for group, props in grouped_properties.items()
+                },
+                "balance": game_state.player_balances[self],
+            }
+
+            suggestions = self._wait_for_decision("downgrade_properties", data)
+            return [PropertyGroup.init_from(group) for group in suggestions]
+        except Exception as e:
+            ErrorLogger.log_error(e)
+            return []
 
 
     def get_mortgaging_suggestions(self, game_state: GameState) -> List[Tile]:

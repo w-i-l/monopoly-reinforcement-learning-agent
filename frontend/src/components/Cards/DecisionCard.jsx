@@ -312,6 +312,127 @@ const UpgradePropertiesDecision = ({
   );
 };
 
+
+const DowngradePropertiesDecision = ({
+  pendingDecision,
+  handleDecision,
+  selectedItems,
+  toggleSelection,
+}) => {
+  const colorMap = {
+    brown: "#845031",
+    light_blue: "#c0e0f9",
+    pink: "#b63785",
+    orange: "#d39423",
+    red: "#c3141b",
+    yellow: "#fdee01",
+    green: "#5aa757",
+    blue: "#1166b0",
+    railway: "#000000",
+    utility: "#444444",
+  };
+
+  function capitalizeFirstLetter(val) {
+    return String(val).charAt(0).toUpperCase() + String(val).slice(1);
+  }
+
+  function formatGroupName(name) {
+    return capitalizeFirstLetter(name.replace("_", " "));
+  }
+
+  return (
+    <DecisionCard
+      title="Downgrade Properties"
+      onSkip={() => handleDecision([])}
+      actions={
+        <Button
+          variant="primary"
+          onClick={() => handleDecision(Array.from(selectedItems))}
+          disabled={selectedItems.size === 0}
+          className="w-full"
+        >
+          Confirm Selected Downgrades ({selectedItems.size})
+        </Button>
+      }
+    >
+      <InfoItem
+        label="Your Balance"
+        value={`${pendingDecision.data.balance}₩`}
+      />
+      <h4 className="font-medium text-gray-700 mt-4 mb-2">
+        Select properties to downgrade:
+      </h4>
+      <div className="max-h-72 overflow-y-auto pr-2">
+        <div className="grid grid-cols-1 gap-4">
+          {Object.entries(pendingDecision.data.grouped_properties).map(
+            ([group, groupInfo]) => {
+              const [props, cost] = groupInfo;
+              const isSelected = selectedItems.has(group);  
+              return (
+                <div
+                  key={group}
+                  className={`
+                  border-2 p-3 rounded-lg transition-colors
+                  ${
+                    isSelected
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200 hover:border-blue-200"
+                  }
+                `}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center">
+                      <div
+                        style={{
+                          background: `${colorMap[group]}`,
+                          width: "16px",
+                          height: "16px",
+                          borderRadius: "50%",
+                          marginRight: "8px",
+                        }}
+                      />
+                      <h4 className="font-medium text-gray-800">
+                        {formatGroupName(group)}
+                      </h4>
+                    </div>
+                    <div className="text-sm bg-white px-2 py-1 rounded-md border border-gray-200 font-medium text-gray-700">
+                      Cost: {cost}₩
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-md p-2 border border-gray-200 mb-3">
+                    <div className="text-sm text-gray-600 mb-1">
+                      Properties:
+                    </div>
+                    <div className="grid grid-cols-1 gap-1">
+                      {props.map((prop, idx) => (
+                        <div
+                          key={idx}
+                          className="text-gray-800 text-sm py-1 px-2 bg-gray-50 rounded"
+                        >
+                          {prop}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Button
+                    variant={isSelected ? "primary" : "outline"}
+                    onClick={() => toggleSelection(group)}
+                    className="w-full"
+                  >
+                    {isSelected ? "Selected" : "Select for Downgrade"}
+                  </Button>
+                </div>
+              );
+            }
+          )}
+        </div>
+      </div>
+    </DecisionCard>
+  );
+};
+
 // 3. Mortgage Properties Decision
 const MortgagePropertiesDecision = ({
   pendingDecision,
@@ -619,6 +740,15 @@ const DecisionUI = ({
 
     upgrade_properties: () => (
       <UpgradePropertiesDecision
+        pendingDecision={pendingDecision}
+        handleDecision={handleDecision}
+        selectedItems={selectedItems}
+        toggleSelection={toggleSelection}
+      />
+    ),
+
+    downgrade_properties: () => (
+      <DowngradePropertiesDecision
         pendingDecision={pendingDecision}
         handleDecision={handleDecision}
         selectedItems={selectedItems}
