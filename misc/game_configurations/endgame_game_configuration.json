@@ -114,17 +114,12 @@
         },
         "escape_jail_cards": {
             "Human Player": 0,
-            "DQN player": 1
+            "DQN player": 0
         },
         "mortgaged_properties": [
             "Gara Progresul"
         ],
         "is_owned": [
-            "B-dul Magheru",
-            "B-dul Eroilor",
-            "Cotroceni",
-            "Calea Dorobantilor",
-            "B-dul Primaverii",
             "Calea Victoriei",
             "Uzina de Apa",
             "Gara Progresul",
@@ -145,7 +140,12 @@
             "B-dul Kogalniceanu",
             "Piata Unirii",
             "Drumul Taberei",
-            "B-dul 1 Mai"
+            "B-dul 1 Mai",
+            "B-dul Magheru",
+            "B-dul Eroilor",
+            "Cotroceni",
+            "Calea Dorobantilor",
+            "B-dul Primaverii"
         ],
         "doubles_rolled": 0,
         "current_player_index": 1,

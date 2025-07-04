@@ -111,16 +111,10 @@
         },
         "escape_jail_cards": {
             "DQN player": 0,
-            "Human Player": 1
+            "Human Player": 0
         },
         "mortgaged_properties": [],
         "is_owned": [
-            "Drumul Taberei",
-            "B-dul 1 Mai",
-            "B-dul Titulescu",
-            "B-dul Eroilor",
-            "Cotroceni",
-            "Uzina Electrica",
             "B-dul Primaverii",
             "B-dul Magheru",
             "Gara Progresul",
@@ -137,7 +131,13 @@
             "B-dul Timisoara",
             "Tei",
             "Vitan",
-            "Piata Unirii"
+            "Piata Unirii",
+            "Drumul Taberei",
+            "B-dul 1 Mai",
+            "B-dul Titulescu",
+            "B-dul Eroilor",
+            "Cotroceni",
+            "Uzina Electrica"
         ],
         "doubles_rolled": 0,
         "current_player_index": 1,
