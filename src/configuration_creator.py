@@ -90,7 +90,6 @@ def create_advanced_strategic_scenario():
     game_state.player_positions[human_agent] = 38
     
     game_state.current_player_index = 1
-    game_state.receive_get_out_of_jail_card(dqn_agent)
     
     return game_state, {
         "scenario_name": "advanced_multi_decision_strategic_test",
@@ -197,8 +196,6 @@ def create_end_game_pressure_scenario():
     
     game_state.send_player_to_jail(dqn_agent)
     game_state.count_turn_in_jail(dqn_agent)
-    
-    game_state.receive_get_out_of_jail_card(dqn_agent)
     
     game_state.current_player_index = 1 
     
