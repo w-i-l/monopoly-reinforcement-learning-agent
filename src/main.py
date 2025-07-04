@@ -177,22 +177,6 @@ def handle_max_turns_reached(human_player, game_manager, players, turn_count):
             max_turns_reached=True,
             error="No valid players found"
         )
-
-
-def extract_player_name_from_exception(exception_str):
-    """Extract player name from exception message"""
-    # Handle different exception message formats
-    if "is bankrupt" in exception_str:
-        return exception_str.replace("BankrupcyException: ", "").replace(" is bankrupt", "")
-    elif "NotEnoughBalanceException:" in exception_str:
-        # Extract player name from balance exception if format allows
-        return exception_str.split(":")[0].replace("NotEnoughBalanceException", "").strip()
-    else:
-        # Fallback - try to extract any player name from the string
-        for player_name in ["Human Player", "DQN Player", "DQN player"]:
-            if player_name in exception_str:
-                return player_name
-        return "Unknown Player"
     
 
 if __name__ == "__main__":
